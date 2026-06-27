@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import Link from 'next/link';
 import { AppShell, Icon } from '@/components/app-shell';
 import { db } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
 
 export const metadata: Metadata = {
   title: 'Engine Dashboard | FormEngine Pro',
@@ -174,6 +175,21 @@ export default async function DashboardPage() {
 
   // System health is always high since the app is running
   const systemHealth = '100.0%';
+
+  // Get the current logged-in user (real database auth)
+  let displayName = 'Engineer';
+  try {
+    const user = await getCurrentUser();
+    if (user) {
+      displayName =
+        user.fullName ||
+        user.name ||
+        user.email?.split('@')[0] ||
+        'Engineer';
+    }
+  } catch {
+    // Not logged in — use default
+  }
 
   // Pick an icon for each form based on its name (simple heuristic)
   const iconForForm = (name: string): string => {

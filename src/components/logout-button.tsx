@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 import { Icon } from '@/components/app-shell';
 
 /**
@@ -31,12 +30,9 @@ export function LogoutButton({
     if (busy) return;
     setBusy(true);
     try {
-      const supabase = createClient();
-      await supabase.auth.signOut();
+      await fetch('/api/auth/logout', { method: 'POST' });
     } catch {
-      // Even if signOut fails client-side (e.g. network, missing config),
-      // still redirect to /signin - the middleware will refuse access to
-      // protected routes if the session cookie is gone or invalid.
+      // Even if logout fails, redirect to /signin
     }
     router.push('/signin');
     // Hard fallback in case the preview iframe blocks the client-side nav.

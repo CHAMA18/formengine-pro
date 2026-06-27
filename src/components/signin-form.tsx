@@ -1,25 +1,14 @@
 'use client';
 
-import { useState, useMemo, Suspense, type FormEvent } from 'react';
+import { useState, Suspense, type FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client';
-import { isProviderEnabled } from '@/lib/supabase/providers';
-import { GitHubIcon, GoogleIcon } from '@/components/oauth-icons';
 
 /**
  * SignInForm
  *
- * Client component that owns the email/password form state and wires it to
- * Supabase Auth. Also exposes OAuth sign-in (GitHub + Google).
- *
- * On successful sign-in the user is redirected to:
- *   - the `redirect` query param if present (e.g. /dashboard/templates)
- *   - /dashboard otherwise
- *
- * The redirect uses router.push() for fast client-side navigation, with a
- * hard window.location.assign() fallback after 800ms in case the preview
- * iframe sandbox blocks RSC fetches.
+ * Client component for email/password login using the real database-backed
+ * auth system (POST /api/auth/login). No Supabase dependency.
  */
 export function SignInForm() {
   return (
@@ -34,34 +23,15 @@ function SignInFormInner() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirect') || '/dashboard';
 
-  // createClient() can throw if NEXT_PUBLIC_SUPABASE_URL / ANON_KEY are
-  // missing or malformed. We construct it lazily inside a ref so a bad config
-  // never crashes the render — the submit handler still falls through to
-  // navigateToDashboard() even if Supabase is unreachable.
-  const supabase = useMemo(() => {
-    try {
-      return createClient();
-    } catch {
-      return null;
-    }
-  }, []);
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
-  /**
-   * Unconditional navigation to the dashboard.
-   *
-   * Tries router.push() first (fast client-side nav), then falls back to a
-   * hard window.location.assign() after 500ms if the URL hasn't changed.
-   * The hard fallback always works, even inside the preview iframe sandbox.
-   */
   const navigateToDashboard = () => {
     try {
       router.push(redirectTo);
@@ -87,80 +57,24 @@ function SignInFormInner() {
     setError(null);
     setLoading(true);
 
-    // Attempt real Supabase sign-in so that valid credentials authenticate
-    // the user for real. Regardless of the outcome (success, invalid
-    // credentials, unregistered email, email-not-confirmed, rate limit,
-    // network error), we ALWAYS navigate to the dashboard afterwards.
     try {
-      if (supabase) {
-        await supabase.auth.signInWithPassword({ email, password });
-      }
-    } catch {
-      // Swallow - we navigate to the dashboard regardless.
-    } finally {
-      navigateToDashboard();
-    }
-  };
-
-  const handleOAuth = async (provider: 'github' | 'google') => {
-    if (oauthLoading) return;
-    setError(null);
-    setOauthLoading(provider);
-
-    if (!supabase) {
-      setError(
-        'Supabase is not configured. Sign-in is unavailable — add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env, or click SIGN IN to continue to the dashboard.'
-      );
-      setOauthLoading(null);
-      return;
-    }
-
-    try {
-      // Pre-flight: check if this provider is enabled on the Supabase project
-      // before redirecting. If it isn't, Supabase would return a 400 JSON
-      // response at /auth/v1/authorize and the user would land on a blank
-      // page - we surface the issue in-app instead.
-      const enabled = await isProviderEnabled(provider);
-      if (!enabled) {
-        const providerName = provider === 'github' ? 'GitHub' : 'Google';
-        throw new Error(
-          `${providerName} sign-in is not configured for this project yet. Please ask the project administrator to enable ${providerName} OAuth in the Supabase dashboard (see docs/OAUTH_SETUP.md), or use email/password sign-in instead.`
-        );
-      }
-
-      const { error: oauthError } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(
-            redirectTo
-          )}`,
-        },
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
       });
 
-      if (oauthError) throw oauthError;
-      // The browser will redirect to the OAuth provider, then back to
-      // /auth/callback. No further action needed here.
-    } catch (err) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : `${provider} sign-in failed. Please try again.`;
-      let friendly = message;
-      if (
-        message.includes('Unsupported provider') ||
-        message.includes('provider is not enabled')
-      ) {
-        const providerName = provider === 'github' ? 'GitHub' : 'Google';
-        friendly = `${providerName} sign-in is not configured for this project yet. Please ask the project administrator to enable ${providerName} OAuth in the Supabase dashboard, or use email/password sign-in instead.`;
-      } else if (
-        message.includes('rate limit') ||
-        message.includes('For security purposes')
-      ) {
-        friendly =
-          'Too many attempts. For security, please wait a few minutes before trying again.';
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Login failed');
       }
-      setError(friendly);
-      setOauthLoading(null);
+
+      setSuccess(true);
+      navigateToDashboard();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed. Please try again.');
+      setLoading(false);
     }
   };
 
@@ -169,38 +83,24 @@ function SignInFormInner() {
       <div className="grid grid-cols-2 gap-3">
         <button
           type="button"
-          onClick={() => handleOAuth('github')}
-          disabled={loading || oauthLoading !== null}
-          className="group flex items-center justify-center gap-2.5 rounded-xl border border-fe-border-white-faint bg-fe-input-hollow-bg py-2.5 transition-all duration-200 hover:bg-fe-surface-container-highest disabled:cursor-wait disabled:opacity-60"
+          disabled
+          className="group flex items-center justify-center gap-2.5 rounded-xl border border-fe-border-white-faint bg-fe-input-hollow-bg py-2.5 transition-all duration-200 opacity-50 cursor-not-allowed"
+          title="GitHub OAuth coming soon"
         >
-          {oauthLoading === 'github' ? (
-            <AuthIcon
-              name="progress_activity"
-              className="text-[19px] animate-pulse text-fe-on-surface"
-            />
-          ) : (
-            <GitHubIcon className="h-[19px] w-[19px] text-fe-on-surface transition-transform duration-200 group-hover:scale-110" />
-          )}
+          <GitHubIcon className="h-[19px] w-[19px] text-fe-on-surface" />
           <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-fe-on-surface">
-            {oauthLoading === 'github' ? 'CONNECTING…' : 'GitHub'}
+            GitHub
           </span>
         </button>
         <button
           type="button"
-          onClick={() => handleOAuth('google')}
-          disabled={loading || oauthLoading !== null}
-          className="group flex items-center justify-center gap-2.5 rounded-xl border border-fe-border-white-faint bg-fe-input-hollow-bg py-2.5 transition-all duration-200 hover:bg-fe-surface-container-highest disabled:cursor-wait disabled:opacity-60"
+          disabled
+          className="group flex items-center justify-center gap-2.5 rounded-xl border border-fe-border-white-faint bg-fe-input-hollow-bg py-2.5 transition-all duration-200 opacity-50 cursor-not-allowed"
+          title="Google OAuth coming soon"
         >
-          {oauthLoading === 'google' ? (
-            <AuthIcon
-              name="progress_activity"
-              className="text-[19px] animate-pulse text-fe-on-surface"
-            />
-          ) : (
-            <GoogleIcon className="h-[19px] w-[19px] transition-transform duration-200 group-hover:scale-110" />
-          )}
+          <GoogleIcon className="h-[19px] w-[19px]" />
           <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-fe-on-surface">
-            {oauthLoading === 'google' ? 'CONNECTING…' : 'Google'}
+            Google
           </span>
         </button>
       </div>
@@ -221,7 +121,8 @@ function SignInFormInner() {
             placeholder="dev@company.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-lg border border-fe-border-white-faint bg-fe-input-hollow-bg px-4 py-2.5 text-[13px] text-fe-on-surface placeholder:text-fe-outline/40 transition-all duration-300 outline-none focus:border-fe-primary-container focus:shadow-[0_0_15px_rgba(0,102,255,0.2)]"
+            required
+            className="w-full rounded-lg border border-fe-border-white-faint bg-fe-input-hollow-bg px-4 py-2.5 text-[13px] text-fe-on-surface placeholder:text-fe-on-surface-variant/40 transition-all duration-300 outline-none focus:border-fe-primary-container focus:shadow-[0_0_15px_rgba(0,102,255,0.2)]"
           />
         </FieldShell>
 
@@ -233,7 +134,8 @@ function SignInFormInner() {
               placeholder="••••••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-transparent px-4 py-2.5 text-[13px] text-fe-on-surface placeholder:text-fe-outline/40 outline-none"
+              required
+              className="w-full bg-transparent px-4 py-2.5 text-[13px] text-fe-on-surface placeholder:text-fe-on-surface-variant/40 outline-none"
             />
             <button
               type="button"
@@ -274,13 +176,33 @@ function SignInFormInner() {
           </div>
         )}
 
-        <a
-          href={redirectTo}
-          className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-fe-primary-container px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-fe-on-primary-container transition-all active:scale-[0.99] hover:opacity-95 no-underline"
+        {success && (
+          <div
+            role="alert"
+            className="flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5 text-[12px] leading-[18px] text-emerald-300"
+          >
+            <AuthIcon name="check_circle" className="mt-0.5 text-[16px] text-emerald-400" />
+            <span>Login successful! Redirecting…</span>
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-fe-primary-container px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-fe-on-primary-container transition-all active:scale-[0.99] hover:opacity-95 disabled:opacity-60 disabled:cursor-wait"
         >
-          SIGN IN
-          <AuthIcon name="login" className="text-[17px]" />
-        </a>
+          {loading ? (
+            <>
+              <AuthIcon name="progress_activity" className="text-[17px] animate-spin" />
+              SIGNING IN…
+            </>
+          ) : (
+            <>
+              SIGN IN
+              <AuthIcon name="login" className="text-[17px]" />
+            </>
+          )}
+        </button>
       </form>
     </>
   );
@@ -321,3 +243,6 @@ function FieldShell({
     </div>
   );
 }
+
+// Re-export the OAuth icons for the disabled buttons
+import { GitHubIcon, GoogleIcon } from '@/components/oauth-icons';
