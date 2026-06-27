@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -35,24 +35,29 @@ model Form {
   shareId     String   @unique @default(cuid())
   name        String
   description String?
-  flowchart   String
-  schema      String
+  flowchart   Json
+  schema      Json
   status      String   @default("draft")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   submissions Submission[]
+
+  @@index([status])
+  @@index([createdAt])
 }
 
 model Submission {
   id        DateTime @id @default(now())
   formId    String
-  data      String
+  data      Json
   source    String?
   status    String   @default("Live")
   form      Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
 
   @@index([formId])
+  @@index([status])
+  @@index([id])
 }
 
 model ApiKey {
@@ -61,16 +66,16 @@ model ApiKey {
   keyHash       String    @unique
   keyPrefix     String
   status        String    @default("active")
-  permissions   String    @default("[]")
+  permissions   Json      @default("[]")
   lastRotatedAt DateTime?
   lastUsedAt    DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  @@index([status])
   @@index([keyHash])
 }
 
-/// Session for user authentication (cookie-based sessions)
 model Session {
   id          String   @id @default(cuid())
   token       String   @unique
