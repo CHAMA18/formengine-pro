@@ -1,0 +1,105 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  title     String
+  content   String?
+  published Boolean  @default(false)
+  authorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// A published form built with the Schema Architect flowchart editor.
+/// Each Form has a shareId used in the public URL /f/[shareId].
+model Form {
+  id          String   @id @default(cuid())
+  /// Public-facing slug used in the shareable URL.
+  shareId     String   @unique @default(cuid())
+  name        String
+  description String?
+  /// JSON-serialized flowchart: { nodes: [...], edges: [...], viewport: {...} }
+  /// Stored as JSONB for efficient querying of form structure.
+  flowchart   Json
+  /// JSON-serialized schema generated from the flowchart (the "fields" array).
+  /// Stored as JSONB for efficient querying of field definitions.
+  schema      Json
+  status      String   @default("draft") // "draft" | "published"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  submissions Submission[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+/// A single form submission. Data is stored as JSONB of the
+/// user's answers keyed by field id.
+model Submission {
+  id        DateTime @id @default(now())
+  formId    String
+  /// JSON-serialized answers: { "field_id_1": "value", "field_id_2": "value", ... }
+  /// Stored as JSONB for efficient querying of response data.
+  data      Json
+  /// IP or source of the submitter (best-effort).
+  source    String?
+  status    String   @default("Live") // "Live" | "Pending" | "Failed" | "Queued"
+  form      Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  @@index([formId])
+  @@index([status])
+  @@index([id])
+}
+
+/// An API key for programmatic access to FormEngine Pro's REST API.
+///
+/// Security model:
+///   - The full key (e.g. "fep_live_a1b2c3d4...") is shown to the user ONCE
+///     at creation time and never stored. Only the SHA-256 hash is persisted.
+///   - The keyPrefix (first 12 chars) is stored unhashed so we can display
+///     a recognizable identifier in the UI (e.g. "fep_live_a1b2...").
+///   - Rotation: calling rotate() creates a new key string, updates the hash,
+///     and returns the new full key to the user. The old key immediately stops
+///     working. The key id and metadata (name, permissions) stay the same.
+///   - Revocation: setting status="revoked" or deleting the row kills the key.
+model ApiKey {
+  id            String    @id @default(cuid())
+  /// Human-readable name for this key (e.g. "Production Webhook").
+  name          String
+  /// SHA-256 hash of the full API key string. Used for lookup on each request.
+  keyHash       String    @unique
+  /// First 12 chars of the key — stored unhashed for UI display.
+  keyPrefix     String
+  /// "active" | "revoked"
+  status        String    @default("active")
+  /// JSON array of permission scopes: ["forms:read", "forms:write", "submissions:read", "submissions:write"]
+  permissions   Json      @default("[]")
+  /// When this key was last rotated (nullable for never-rotated keys).
+  lastRotatedAt DateTime?
+  /// When this key was last used (nullable for never-used).
+  lastUsedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status])
+  @@index([keyHash])
+}
