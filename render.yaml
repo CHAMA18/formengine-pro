@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: formengine-pro
+    env: node
+    repo: https://github.com/CHAMA18/formengine-pro
+    branch: main
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npx prisma db push --skip-generate --accept-data-loss && npx next start -p $PORT -H 0.0.0.0
+    healthCheckPath: /
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: formengine-pg
+          property: connectionString
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        value: https://placeholder.supabase.co
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        value: placeholder-anon-key
+
+databases:
+  - name: formengine-pg
+    databaseName: formengine
+    databaseUser: fep
+    plan: free
+    ipAllowList:
+      - source: 0.0.0.0/0
+        description: everywhere
