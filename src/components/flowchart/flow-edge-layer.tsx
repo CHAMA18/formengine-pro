@@ -1,23 +1,43 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import type { FlowNode, FlowEdge } from '@/lib/flowchart/types';
 
 const NODE_WIDTH = 200;
-const NODE_HEIGHT = 64;
+const BASE_NODE_HEIGHT = 64;
+const HANDLE_OFFSET = 12; // handle extends 12px past node edge (h-6 w-6 = 24px, translate-x-1/2 = 12px)
+
+/**
+ * Calculate the actual rendered height of a node based on its content.
+ * - Base: 64px (header with icon + label + badges)
+ * - Options section: +32px (if field with non-empty options)
+ */
+function getNodeHeight(node: FlowNode): number {
+  let h = BASE_NODE_HEIGHT;
+  if (
+    node.type === 'field' &&
+    node.data.options &&
+    node.data.options.filter((o) => o.trim()).length > 0
+  ) {
+    h += 32; // options row
+  }
+  return h;
+}
+
+/**
+ * Get the Y center of a node based on its actual height.
+ */
+function getNodeCenterY(node: FlowNode): number {
+  return node.position.y + getNodeHeight(node) / 2;
+}
 
 /**
  * FlowEdgeLayer
  *
- * Renders all edges as SVG bezier curves with:
- *   - Animated dash flow (moving dashes show data direction)
- *   - Arrowheads colored by branch (blue=default, green=true, red=false)
- *   - Hover state: thicker + brighter on hover
- *   - Click to delete with confirmation tooltip
- *   - Labels on condition branches ("true" / "false")
- *   - Live preview line when dragging a new connection (follows mouse)
+ * Renders SVG bezier curves that connect from the output handle of the source
+ * node to the input handle of the target node. The arrowhead touches the
+ * input handle precisely.
  */
-
 export function FlowEdgeLayer({
   nodes,
   edges,
@@ -48,26 +68,31 @@ export function FlowEdgeLayer({
         const target = nodeMap.get(edge.target);
         if (!source || !target) return null;
 
-        // Calculate anchor points based on node type and branch
+        const sourceH = getNodeHeight(source);
+        const targetH = getNodeHeight(target);
+
+        // Source point: right edge of source node + handle offset
         const isCondition = source.type === 'condition';
         let sx: number, sy: number;
         if (isCondition && edge.branch === 'true') {
-          sx = source.position.x + NODE_WIDTH;
-          sy = source.position.y + NODE_HEIGHT / 3;
+          sx = source.position.x + NODE_WIDTH + HANDLE_OFFSET;
+          sy = source.position.y + sourceH / 3;
         } else if (isCondition && edge.branch === 'false') {
-          sx = source.position.x + NODE_WIDTH;
-          sy = source.position.y + (NODE_HEIGHT * 2) / 3;
+          sx = source.position.x + NODE_WIDTH + HANDLE_OFFSET;
+          sy = source.position.y + (sourceH * 2) / 3;
         } else {
-          sx = source.position.x + NODE_WIDTH;
-          sy = source.position.y + NODE_HEIGHT / 2;
+          sx = source.position.x + NODE_WIDTH + HANDLE_OFFSET;
+          sy = source.position.y + sourceH / 2;
         }
 
-        const tx = target.position.x;
-        const ty = target.position.y + NODE_HEIGHT / 2;
+        // Target point: left edge of target node - handle offset
+        // The arrow tip lands exactly at the center of the input handle
+        const tx = target.position.x - HANDLE_OFFSET;
+        const ty = target.position.y + targetH / 2;
 
-        // Smooth bezier curve
+        // Smooth bezier — horizontal flow with vertical adjustment
         const dx = Math.abs(tx - sx);
-        const offset = Math.max(50, dx * 0.5);
+        const offset = Math.max(60, dx * 0.5);
         const cp1x = sx + offset;
         const cp1y = sy;
         const cp2x = tx - offset;
@@ -97,27 +122,28 @@ export function FlowEdgeLayer({
     }>;
   }, [edges, nodeMap]);
 
-  // Pending edge preview — follows mouse
+  // Pending edge — follows mouse from the output handle
   const pendingPath = useMemo(() => {
     if (!pendingEdgeSource || !mousePos) return null;
     const source = pendingEdgeSource;
+    const sourceH = getNodeHeight(source);
     const isCondition = source.type === 'condition';
     let sx: number, sy: number;
     if (isCondition && pendingEdgeBranch === 'true') {
-      sx = source.position.x + NODE_WIDTH;
-      sy = source.position.y + NODE_HEIGHT / 3;
+      sx = source.position.x + NODE_WIDTH + HANDLE_OFFSET;
+      sy = source.position.y + sourceH / 3;
     } else if (isCondition && pendingEdgeBranch === 'false') {
-      sx = source.position.x + NODE_WIDTH;
-      sy = source.position.y + (NODE_HEIGHT * 2) / 3;
+      sx = source.position.x + NODE_WIDTH + HANDLE_OFFSET;
+      sy = source.position.y + (sourceH * 2) / 3;
     } else {
-      sx = source.position.x + NODE_WIDTH;
-      sy = source.position.y + NODE_HEIGHT / 2;
+      sx = source.position.x + NODE_WIDTH + HANDLE_OFFSET;
+      sy = source.position.y + sourceH / 2;
     }
 
     const tx = mousePos.x;
     const ty = mousePos.y;
     const dx = Math.abs(tx - sx);
-    const offset = Math.max(50, dx * 0.5);
+    const offset = Math.max(60, dx * 0.5);
     const color =
       pendingEdgeBranch === 'true'
         ? '#10b981'
@@ -137,7 +163,6 @@ export function FlowEdgeLayer({
       style={{ width: '100%', height: '100%', overflow: 'visible' }}
     >
       <defs>
-        {/* Arrowhead markers */}
         {[
           { id: 'arrow-amber', color: '#f59e0b' },
           { id: 'arrow-green', color: '#10b981' },
@@ -146,22 +171,16 @@ export function FlowEdgeLayer({
           <marker
             key={marker.id}
             id={marker.id}
-            markerWidth="12"
-            markerHeight="12"
-            refX="10"
-            refY="4"
+            markerWidth="10"
+            markerHeight="10"
+            refX="8"
+            refY="3"
             orient="auto"
             markerUnits="strokeWidth"
           >
-            <path d="M0,0 L0,8 L10,4 z" fill={marker.color} />
+            <path d="M0,0 L0,6 L8,3 z" fill={marker.color} />
           </marker>
         ))}
-
-        {/* Animated dash flow for active connections */}
-        <linearGradient id="edge-gradient-amber" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.3" />
-          <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.8" />
-        </linearGradient>
       </defs>
 
       {/* Render edges */}
@@ -182,13 +201,9 @@ export function FlowEdgeLayer({
             onClick={() => onEdgeDelete?.(p.id)}
           >
             {/* Invisible thick hit area */}
-            <path
-              d={p.path}
-              fill="none"
-              stroke="transparent"
-              strokeWidth={20}
-            />
-            {/* Glow underlay on hover */}
+            <path d={p.path} fill="none" stroke="transparent" strokeWidth={20} />
+
+            {/* Glow on hover */}
             {isHovered && (
               <path
                 d={p.path}
@@ -199,7 +214,8 @@ export function FlowEdgeLayer({
                 style={{ filter: 'blur(4px)' }}
               />
             )}
-            {/* Main edge path */}
+
+            {/* Main edge */}
             <path
               d={p.path}
               fill="none"
@@ -207,11 +223,10 @@ export function FlowEdgeLayer({
               strokeWidth={isHovered ? 3 : 2}
               strokeOpacity={isHovered ? 1 : 0.7}
               markerEnd={`url(#${markerId})`}
-              style={{
-                transition: 'stroke-width 0.15s ease, stroke-opacity 0.15s ease',
-              }}
+              style={{ transition: 'stroke-width 0.15s ease, stroke-opacity 0.15s ease' }}
             />
-            {/* Animated dash overlay (subtle flowing effect) */}
+
+            {/* Animated flowing dashes */}
             <path
               d={p.path}
               fill="none"
@@ -219,10 +234,9 @@ export function FlowEdgeLayer({
               strokeWidth={1}
               strokeOpacity={0.4}
               strokeDasharray="4 8"
-              style={{
-                animation: 'dash-flow 1.5s linear infinite',
-              }}
+              style={{ animation: 'dash-flow 1.5s linear infinite' }}
             />
+
             {/* Branch label */}
             {p.label && (
               <g>
@@ -250,6 +264,7 @@ export function FlowEdgeLayer({
                 </text>
               </g>
             )}
+
             {/* Delete tooltip on hover */}
             {isHovered && (
               <g>
@@ -279,7 +294,7 @@ export function FlowEdgeLayer({
         );
       })}
 
-      {/* Pending edge preview (live, follows mouse) */}
+      {/* Live preview while dragging */}
       {pendingPath && (
         <>
           <path
@@ -289,11 +304,8 @@ export function FlowEdgeLayer({
             strokeWidth={2.5}
             strokeOpacity={0.6}
             strokeDasharray="8 4"
-            style={{
-              animation: 'dash-flow 0.8s linear infinite',
-            }}
+            style={{ animation: 'dash-flow 0.8s linear infinite' }}
           />
-          {/* Target indicator at mouse position */}
           <circle
             cx={mousePos?.x ?? 0}
             cy={mousePos?.y ?? 0}
@@ -316,15 +328,9 @@ export function FlowEdgeLayer({
         </>
       )}
 
-      {/* Keyframes for animations */}
       <style>{`
-        @keyframes dash-flow {
-          to { stroke-dashoffset: -12; }
-        }
-        @keyframes pulse-ring {
-          0% { r: 6; opacity: 0.6; }
-          100% { r: 18; opacity: 0; }
-        }
+        @keyframes dash-flow { to { stroke-dashoffset: -12; } }
+        @keyframes pulse-ring { 0% { r: 6; opacity: 0.6; } 100% { r: 18; opacity: 0; } }
       `}</style>
     </svg>
   );
