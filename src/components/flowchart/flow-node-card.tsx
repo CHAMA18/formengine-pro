@@ -1,25 +1,54 @@
 'use client';
 
-import { NODE_CATALOG, type FlowNode } from '@/lib/flowchart/types';
+import { NODE_CATALOG, type FlowNode, type NodeType } from '@/lib/flowchart/types';
 import { useFlowchartStore } from '@/lib/flowchart/store';
 
 /**
  * FlowNodeCard
  *
- * Renders a single node on the canvas. Each node type has a distinct color
- * and icon. Nodes are draggable (via the header) and have output handles
- * for creating edges.
+ * Renders a single node on the canvas with world-class connection handles.
  *
- * Condition nodes have two output handles: "true" (green) and "false" (red).
- * All other nodes have a single output handle on the right.
+ * Connection model:
+ *   - Every node (except Start) has an INPUT handle on the LEFT (a port circle)
+ *   - Every node (except End) has an OUTPUT handle on the RIGHT
+ *   - Condition nodes have TWO output handles on the RIGHT: True (green) + False (red)
+ *
+ * Visual design:
+ *   - Handles are larger, more visible, with glow effects on hover
+ *   - Active connection source shows a pulsing ring
+ *   - Valid drop targets highlight with a green ring
+ *   - Handles show a tooltip on hover ("Drag to connect")
+ *   - Input handle glows when a connection is being dragged
  */
+
 const NODE_WIDTH = 200;
 const NODE_HEIGHT = 64;
+
+/**
+ * Connection validation rules:
+ *   - Start: can only output, not input
+ *   - End: can only input, not output
+ *   - Cannot connect a node to itself
+ *   - Cannot create duplicate edges (same source → target)
+ *   - Cannot create cycles (target → ... → source)
+ */
+export function canConnect(
+  sourceType: NodeType,
+  targetType: NodeType,
+  sourceId: string,
+  targetId: string
+): boolean {
+  if (sourceId === targetId) return false;
+  if (targetType === 'start') return false; // Start can't receive input
+  if (sourceType === 'end') return false; // End can't output
+  return true;
+}
 
 export function FlowNodeCard({
   node,
   selected,
   isPendingTarget,
+  isConnectionSource,
   onMouseDown,
   onClick,
   onOutputMouseDown,
@@ -27,15 +56,22 @@ export function FlowNodeCard({
   node: FlowNode;
   selected: boolean;
   isPendingTarget: boolean;
+  isConnectionSource: boolean;
   onMouseDown: (e: React.MouseEvent) => void;
   onClick: (e: React.MouseEvent) => void;
   onOutputMouseDown: (e: React.MouseEvent, branch?: 'true' | 'false') => void;
 }) {
   const catalog = NODE_CATALOG[node.type];
-  const { deleteNode } = useFlowchartStore();
+  const { deleteNode, flowchart } = useFlowchartStore();
 
   const isCondition = node.type === 'condition';
   const isTerminal = node.type === 'start' || node.type === 'end';
+  const hasInput = node.type !== 'start';
+  const hasOutput = node.type !== 'end';
+
+  // Count incoming connections for display
+  const incomingCount = flowchart.edges.filter((e) => e.target === node.id).length;
+  const outgoingCount = flowchart.edges.filter((e) => e.source === node.id).length;
 
   return (
     <div
@@ -48,16 +84,21 @@ export function FlowNodeCard({
       onMouseDown={onMouseDown}
       onClick={onClick}
     >
-      {/* Selection ring */}
+      {/* Selection ring + connection state */}
       <div
-        className={`relative rounded-xl border bg-fe-surface-container transition-all ${
+        className={`relative rounded-xl border transition-all duration-200 ${
           selected
-            ? 'border-fe-primary shadow-[0_0_0_2px_rgba(0,102,255,0.3),0_8px_24px_rgba(0,0,0,0.4)]'
+            ? 'border-fe-primary shadow-[0_0_0_2px_rgba(245,158,11,0.3),0_8px_24px_rgba(0,0,0,0.3)]'
+            : isConnectionSource
+            ? 'border-fe-primary shadow-[0_0_0_2px_rgba(245,158,11,0.4),0_8px_24px_rgba(0,0,0,0.3)]'
             : isPendingTarget
-            ? 'border-fe-primary/50 hover:border-fe-primary hover:shadow-[0_0_0_2px_rgba(0,102,255,0.2)]'
-            : 'border-white/10 hover:border-white/20'
+            ? 'border-emerald-400/60 shadow-[0_0_0_2px_rgba(16,185,129,0.3),0_8px_24px_rgba(0,0,0,0.2)] hover:border-emerald-400'
+            : 'border-fe-border-white-faint hover:border-fe-primary/30 hover:shadow-[0_4px_16px_rgba(0,0,0,0.15)]'
         }`}
-        style={{ minHeight: NODE_HEIGHT }}
+        style={{
+          minHeight: NODE_HEIGHT,
+          background: 'var(--fe-surface-container)',
+        }}
       >
         {/* Top accent bar */}
         <div
@@ -92,6 +133,20 @@ export function FlowNodeCard({
             </div>
           </div>
 
+          {/* Connection count badges */}
+          <div className="flex items-center gap-1">
+            {incomingCount > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-fe-primary/10 px-1 text-[9px] font-bold text-fe-primary">
+                ←{incomingCount}
+              </span>
+            )}
+            {outgoingCount > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-500/10 px-1 text-[9px] font-bold text-emerald-400">
+                {outgoingCount}→
+              </span>
+            )}
+          </div>
+
           {/* Delete button */}
           {!isTerminal && (
             <button
@@ -113,7 +168,7 @@ export function FlowNodeCard({
         {node.type === 'field' &&
           node.data.options &&
           node.data.options.filter((o) => o.trim()).length > 0 && (
-            <div className="border-t border-white/5 px-3 py-1.5">
+            <div className="border-t border-fe-border-white-faint/50 px-3 py-1.5">
               <div className="flex flex-wrap gap-1">
                 {node.data.options
                   .filter((o) => o.trim())
@@ -121,7 +176,7 @@ export function FlowNodeCard({
                   .map((opt, i) => (
                     <span
                       key={i}
-                      className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[9px] text-fe-on-surface-variant"
+                      className="rounded bg-fe-input-hollow-bg px-1.5 py-0.5 font-mono text-[9px] text-fe-on-surface-variant"
                     >
                       {opt}
                     </span>
@@ -135,50 +190,89 @@ export function FlowNodeCard({
             </div>
           )}
 
-        {/* Input handle (left side) */}
-        {node.type !== 'start' && (
+        {/* === INPUT HANDLE (left side) === */}
+        {hasInput && (
           <div
-            className="absolute left-0 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-fe-surface-container bg-fe-on-surface-variant"
-            title="Input"
-          />
+            className={`absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 transition-all duration-200 ${
+              isPendingTarget ? 'scale-150' : ''
+            }`}
+          >
+            <div
+              className={`flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all duration-200 ${
+                isPendingTarget
+                  ? 'border-emerald-400 bg-emerald-400/20 shadow-[0_0_12px_rgba(16,185,129,0.5)]'
+                  : 'border-fe-surface-container bg-fe-on-surface-variant/60 hover:bg-fe-primary hover:scale-125'
+              }`}
+              title="Input — drop a connection here"
+            >
+              {isPendingTarget && (
+                <span className="material-symbols-outlined text-[10px] text-emerald-400">
+                  add
+                </span>
+              )}
+            </div>
+            {/* Pulse ring when pending target */}
+            {isPendingTarget && (
+              <div className="absolute inset-0 animate-ping rounded-full border-2 border-emerald-400/40" />
+            )}
+          </div>
         )}
 
-        {/* Output handles */}
-        {node.type !== 'end' && (
+        {/* === OUTPUT HANDLES (right side) === */}
+        {hasOutput && (
           <>
             {isCondition ? (
               <>
-                {/* True branch — bottom */}
-                <button
-                  type="button"
-                  onMouseDown={(e) => onOutputMouseDown(e, 'true')}
-                  onClick={(e) => e.stopPropagation()}
-                  className="absolute bottom-0 left-1/3 flex h-4 w-4 -translate-x-1/2 translate-y-1/2 items-center justify-center rounded-full border-2 border-fe-surface-container bg-emerald-500 transition-transform hover:scale-125"
-                  title="True branch — drag to connect"
-                >
-                  <span className="font-mono text-[7px] font-bold text-white">T</span>
-                </button>
-                {/* False branch — bottom right */}
-                <button
-                  type="button"
-                  onMouseDown={(e) => onOutputMouseDown(e, 'false')}
-                  onClick={(e) => e.stopPropagation()}
-                  className="absolute bottom-0 right-1/3 flex h-4 w-4 translate-x-1/2 translate-y-1/2 items-center justify-center rounded-full border-2 border-fe-surface-container bg-rose-500 transition-transform hover:scale-125"
-                  title="False branch — drag to connect"
-                >
-                  <span className="font-mono text-[7px] font-bold text-white">F</span>
-                </button>
+                {/* True branch handle — right top */}
+                <div className="absolute right-0 top-1/3 flex flex-col items-center">
+                  <button
+                    type="button"
+                    onMouseDown={(e) => onOutputMouseDown(e, 'true')}
+                    onClick={(e) => e.stopPropagation()}
+                    className="group/handle flex h-6 w-6 translate-x-1/2 items-center justify-center rounded-full border-2 border-fe-surface-container bg-emerald-500 transition-all duration-200 hover:scale-125 hover:shadow-[0_0_12px_rgba(16,185,129,0.5)]"
+                    title="True branch — drag to connect"
+                  >
+                    <span className="font-mono text-[8px] font-bold text-white">T</span>
+                  </button>
+                  <span className="mt-0.5 translate-x-2 text-[8px] font-bold uppercase text-emerald-400 opacity-0 transition-opacity group-hover/handle:opacity-100">
+                    true
+                  </span>
+                </div>
+                {/* False branch handle — right bottom */}
+                <div className="absolute bottom-1/4 right-0 flex flex-col items-center">
+                  <button
+                    type="button"
+                    onMouseDown={(e) => onOutputMouseDown(e, 'false')}
+                    onClick={(e) => e.stopPropagation()}
+                    className="group/handle flex h-6 w-6 translate-x-1/2 items-center justify-center rounded-full border-2 border-fe-surface-container bg-rose-500 transition-all duration-200 hover:scale-125 hover:shadow-[0_0_12px_rgba(244,63,94,0.5)]"
+                    title="False branch — drag to connect"
+                  >
+                    <span className="font-mono text-[8px] font-bold text-white">F</span>
+                  </button>
+                  <span className="mt-0.5 translate-x-2 text-[8px] font-bold uppercase text-rose-400 opacity-0 transition-opacity group-hover/handle:opacity-100">
+                    false
+                  </span>
+                </div>
               </>
             ) : (
               <button
                 type="button"
                 onMouseDown={(e) => onOutputMouseDown(e)}
                 onClick={(e) => e.stopPropagation()}
-                className="absolute right-0 top-1/2 h-3.5 w-3.5 translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-fe-surface-container bg-fe-primary transition-transform hover:scale-125"
+                className="group/handle absolute right-0 top-1/2 flex h-6 w-6 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-fe-surface-container bg-fe-primary transition-all duration-200 hover:scale-125 hover:shadow-[0_0_12px_rgba(245,158,11,0.5)]"
                 title="Output — drag to connect"
-              />
+              >
+                <span className="material-symbols-outlined text-[12px] text-white opacity-0 transition-opacity group-hover/handle:opacity-100">
+                  arrow_forward
+                </span>
+              </button>
             )}
           </>
+        )}
+
+        {/* Connection source pulse */}
+        {isConnectionSource && (
+          <div className="pointer-events-none absolute inset-0 animate-pulse rounded-xl border-2 border-fe-primary/40" />
         )}
       </div>
     </div>

@@ -32,6 +32,7 @@ export function FlowchartBuilder() {
     offsetX: number;
     offsetY: number;
   } | null>(null);
+  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
 
   const {
     flowchart,
@@ -43,6 +44,7 @@ export function FlowchartBuilder() {
     startEdge,
     completeEdge,
     cancelEdge,
+    deleteEdge,
   } = useFlowchartStore();
 
   // --- Pan & Zoom ---
@@ -91,14 +93,28 @@ export function FlowchartBuilder() {
           draggingNode.offsetY;
         moveNode(draggingNode.id, { x, y });
       }
+
+      // Track mouse position for live edge preview
+      if (pendingEdge) {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left - viewport.x) / viewport.zoom;
+        const y = (e.clientY - rect.top - viewport.y) / viewport.zoom;
+        setMousePos({ x, y });
+      }
     },
-    [isPanning, draggingNode, viewport, moveNode]
+    [isPanning, draggingNode, viewport, moveNode, pendingEdge]
   );
 
   const handleCanvasMouseUp = useCallback(() => {
     setIsPanning(false);
     setDraggingNode(null);
-  }, []);
+    if (pendingEdge) {
+      // If we release without completing the edge, cancel it
+      setMousePos(null);
+    }
+  }, [pendingEdge]);
 
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
@@ -200,6 +216,27 @@ export function FlowchartBuilder() {
     };
   }, [isPanning, draggingNode, handleCanvasMouseMove, handleCanvasMouseUp]);
 
+  // Escape key cancels pending edge; Delete key removes selected node
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && pendingEdge) {
+        cancelEdge();
+        setMousePos(null);
+      }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedNodeId) {
+        const target = e.target as HTMLElement;
+        // Don't delete if typing in an input
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
+        const node = flowchart.nodes.find((n) => n.id === selectedNodeId);
+        if (node && node.type !== 'start' && node.type !== 'end') {
+          useFlowchartStore.getState().deleteNode(selectedNodeId);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [pendingEdge, selectedNodeId, cancelEdge, flowchart.nodes]);
+
   const selectedNode = flowchart.nodes.find((n) => n.id === selectedNodeId) ?? null;
   const pendingEdgeSource = pendingEdge
     ? flowchart.nodes.find((n) => n.id === pendingEdge.source)
@@ -252,6 +289,8 @@ export function FlowchartBuilder() {
               edges={flowchart.edges}
               pendingEdgeSource={pendingEdgeSource}
               pendingEdgeBranch={pendingEdge?.branch}
+              mousePos={mousePos}
+              onEdgeDelete={(id) => deleteEdge(id)}
             />
 
             {/* Node cards */}
@@ -261,6 +300,7 @@ export function FlowchartBuilder() {
                 node={node}
                 selected={node.id === selectedNodeId}
                 isPendingTarget={!!pendingEdge && pendingEdge.source !== node.id}
+                isConnectionSource={pendingEdge?.source === node.id}
                 onMouseDown={(e) => handleNodeDragStart(e, node)}
                 onClick={(e) => handleNodeClick(e, node.id)}
                 onOutputMouseDown={(e, branch) =>

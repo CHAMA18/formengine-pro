@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import type { FlowNode, FlowEdge } from '@/lib/flowchart/types';
 
 const NODE_WIDTH = 200;
@@ -9,26 +9,32 @@ const NODE_HEIGHT = 64;
 /**
  * FlowEdgeLayer
  *
- * Renders all edges as SVG bezier curves with arrowheads. Condition branch
- * edges are colored green (true) or red (false).
- *
- * If pendingEdgeSource is set, a dashed preview line follows from the
- * source node to... well, it's a static preview showing the source. The
- * actual mouse-following line would require tracking mouse position which
- * adds complexity; the pending hint bar tells the user to click a target.
+ * Renders all edges as SVG bezier curves with:
+ *   - Animated dash flow (moving dashes show data direction)
+ *   - Arrowheads colored by branch (blue=default, green=true, red=false)
+ *   - Hover state: thicker + brighter on hover
+ *   - Click to delete with confirmation tooltip
+ *   - Labels on condition branches ("true" / "false")
+ *   - Live preview line when dragging a new connection (follows mouse)
  */
+
 export function FlowEdgeLayer({
   nodes,
   edges,
   pendingEdgeSource,
   pendingEdgeBranch,
+  mousePos,
+  onEdgeDelete,
 }: {
   nodes: FlowNode[];
   edges: FlowEdge[];
   pendingEdgeSource: FlowNode | null;
   pendingEdgeBranch?: 'true' | 'false';
+  mousePos?: { x: number; y: number } | null;
+  onEdgeDelete?: (id: string) => void;
 }) {
-  // Build a map for quick node lookup
+  const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
+
   const nodeMap = useMemo(() => {
     const map = new Map<string, FlowNode>();
     for (const node of nodes) map.set(node.id, node);
@@ -42,15 +48,15 @@ export function FlowEdgeLayer({
         const target = nodeMap.get(edge.target);
         if (!source || !target) return null;
 
-        // Calculate anchor points
+        // Calculate anchor points based on node type and branch
         const isCondition = source.type === 'condition';
         let sx: number, sy: number;
         if (isCondition && edge.branch === 'true') {
-          sx = source.position.x + NODE_WIDTH / 3;
-          sy = source.position.y + NODE_HEIGHT;
+          sx = source.position.x + NODE_WIDTH;
+          sy = source.position.y + NODE_HEIGHT / 3;
         } else if (isCondition && edge.branch === 'false') {
-          sx = source.position.x + (NODE_WIDTH * 2) / 3;
-          sy = source.position.y + NODE_HEIGHT;
+          sx = source.position.x + NODE_WIDTH;
+          sy = source.position.y + (NODE_HEIGHT * 2) / 3;
         } else {
           sx = source.position.x + NODE_WIDTH;
           sy = source.position.y + NODE_HEIGHT / 2;
@@ -59,9 +65,9 @@ export function FlowEdgeLayer({
         const tx = target.position.x;
         const ty = target.position.y + NODE_HEIGHT / 2;
 
-        // Bezier control points — horizontal-ish curve
+        // Smooth bezier curve
         const dx = Math.abs(tx - sx);
-        const offset = Math.max(40, dx * 0.5);
+        const offset = Math.max(50, dx * 0.5);
         const cp1x = sx + offset;
         const cp1y = sy;
         const cp2x = tx - offset;
@@ -74,9 +80,8 @@ export function FlowEdgeLayer({
             ? '#10b981'
             : edge.branch === 'false'
             ? '#f43f5e'
-            : '#3b82f6';
+            : '#f59e0b';
 
-        // Label position at midpoint of curve
         const midX = (sx + tx) / 2;
         const midY = (sy + ty) / 2;
 
@@ -92,109 +97,151 @@ export function FlowEdgeLayer({
     }>;
   }, [edges, nodeMap]);
 
-  // Pending edge preview
+  // Pending edge preview — follows mouse
   const pendingPath = useMemo(() => {
-    if (!pendingEdgeSource) return null;
+    if (!pendingEdgeSource || !mousePos) return null;
     const source = pendingEdgeSource;
     const isCondition = source.type === 'condition';
     let sx: number, sy: number;
     if (isCondition && pendingEdgeBranch === 'true') {
-      sx = source.position.x + NODE_WIDTH / 3;
-      sy = source.position.y + NODE_HEIGHT;
+      sx = source.position.x + NODE_WIDTH;
+      sy = source.position.y + NODE_HEIGHT / 3;
     } else if (isCondition && pendingEdgeBranch === 'false') {
-      sx = source.position.x + (NODE_WIDTH * 2) / 3;
-      sy = source.position.y + NODE_HEIGHT;
+      sx = source.position.x + NODE_WIDTH;
+      sy = source.position.y + (NODE_HEIGHT * 2) / 3;
     } else {
       sx = source.position.x + NODE_WIDTH;
       sy = source.position.y + NODE_HEIGHT / 2;
     }
-    // Show a short stub indicating where the edge will start
-    const stubLength = 60;
+
+    const tx = mousePos.x;
+    const ty = mousePos.y;
+    const dx = Math.abs(tx - sx);
+    const offset = Math.max(50, dx * 0.5);
+    const color =
+      pendingEdgeBranch === 'true'
+        ? '#10b981'
+        : pendingEdgeBranch === 'false'
+        ? '#f43f5e'
+        : '#f59e0b';
+
     return {
-      path: `M ${sx} ${sy} L ${sx + stubLength} ${sy}`,
-      color: pendingEdgeBranch === 'true' ? '#10b981' : pendingEdgeBranch === 'false' ? '#f43f5e' : '#3b82f6',
+      path: `M ${sx} ${sy} C ${sx + offset} ${sy}, ${tx - offset} ${ty}, ${tx} ${ty}`,
+      color,
     };
-  }, [pendingEdgeSource, pendingEdgeBranch]);
+  }, [pendingEdgeSource, pendingEdgeBranch, mousePos]);
 
   return (
     <svg
       className="pointer-events-none absolute left-0 top-0"
-      style={{
-        width: '100%',
-        height: '100%',
-        overflow: 'visible',
-      }}
+      style={{ width: '100%', height: '100%', overflow: 'visible' }}
     >
       <defs>
-        {/* Arrowhead markers — one per color */}
+        {/* Arrowhead markers */}
         {[
-          { id: 'arrow-blue', color: '#3b82f6' },
+          { id: 'arrow-amber', color: '#f59e0b' },
           { id: 'arrow-green', color: '#10b981' },
           { id: 'arrow-red', color: '#f43f5e' },
         ].map((marker) => (
           <marker
             key={marker.id}
             id={marker.id}
-            markerWidth="10"
-            markerHeight="10"
-            refX="8"
-            refY="3"
+            markerWidth="12"
+            markerHeight="12"
+            refX="10"
+            refY="4"
             orient="auto"
             markerUnits="strokeWidth"
           >
-            <path d="M0,0 L0,6 L8,3 z" fill={marker.color} />
+            <path d="M0,0 L0,8 L10,4 z" fill={marker.color} />
           </marker>
         ))}
+
+        {/* Animated dash flow for active connections */}
+        <linearGradient id="edge-gradient-amber" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.3" />
+          <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.8" />
+        </linearGradient>
       </defs>
 
+      {/* Render edges */}
       {paths.map((p) => {
         const markerId =
           p.color === '#10b981'
             ? 'arrow-green'
             : p.color === '#f43f5e'
             ? 'arrow-red'
-            : 'arrow-blue';
+            : 'arrow-amber';
+        const isHovered = hoveredEdge === p.id;
         return (
-          <g key={p.id} className="pointer-events-auto">
-            {/* Invisible thick path for easier click-to-delete */}
+          <g
+            key={p.id}
+            className="pointer-events-auto cursor-pointer"
+            onMouseEnter={() => setHoveredEdge(p.id)}
+            onMouseLeave={() => setHoveredEdge(null)}
+            onClick={() => onEdgeDelete?.(p.id)}
+          >
+            {/* Invisible thick hit area */}
             <path
               d={p.path}
               fill="none"
               stroke="transparent"
-              strokeWidth={16}
-              className="cursor-pointer"
-              onClick={() => {
-                // Delegate to the store via a custom event
-                const event = new CustomEvent('flowedge-delete', { detail: p.id });
-                window.dispatchEvent(event);
-              }}
+              strokeWidth={20}
             />
+            {/* Glow underlay on hover */}
+            {isHovered && (
+              <path
+                d={p.path}
+                fill="none"
+                stroke={p.color}
+                strokeWidth={6}
+                strokeOpacity={0.2}
+                style={{ filter: 'blur(4px)' }}
+              />
+            )}
+            {/* Main edge path */}
             <path
               d={p.path}
               fill="none"
               stroke={p.color}
-              strokeWidth={2}
-              strokeOpacity={0.7}
+              strokeWidth={isHovered ? 3 : 2}
+              strokeOpacity={isHovered ? 1 : 0.7}
               markerEnd={`url(#${markerId})`}
+              style={{
+                transition: 'stroke-width 0.15s ease, stroke-opacity 0.15s ease',
+              }}
             />
+            {/* Animated dash overlay (subtle flowing effect) */}
+            <path
+              d={p.path}
+              fill="none"
+              stroke={p.color}
+              strokeWidth={1}
+              strokeOpacity={0.4}
+              strokeDasharray="4 8"
+              style={{
+                animation: 'dash-flow 1.5s linear infinite',
+              }}
+            />
+            {/* Branch label */}
             {p.label && (
               <g>
                 <rect
-                  x={p.midX - 20}
-                  y={p.midY - 9}
-                  width={40}
-                  height={18}
-                  rx={9}
-                  fill="#0a0d14"
+                  x={p.midX - 24}
+                  y={p.midY - 10}
+                  width={48}
+                  height={20}
+                  rx={10}
+                  fill="var(--fe-surface-container)"
                   stroke={p.color}
-                  strokeWidth={1}
-                  strokeOpacity={0.5}
+                  strokeWidth={1.5}
+                  strokeOpacity={0.6}
                 />
                 <text
                   x={p.midX}
-                  y={p.midY + 3}
+                  y={p.midY + 4}
                   textAnchor="middle"
-                  fontSize={9}
+                  fontSize={10}
                   fontFamily="ui-monospace, monospace"
                   fontWeight={700}
                   fill={p.color}
@@ -203,20 +250,82 @@ export function FlowEdgeLayer({
                 </text>
               </g>
             )}
+            {/* Delete tooltip on hover */}
+            {isHovered && (
+              <g>
+                <rect
+                  x={p.midX - 40}
+                  y={p.midY - 32}
+                  width={80}
+                  height={18}
+                  rx={9}
+                  fill="#ef4444"
+                  fillOpacity={0.9}
+                />
+                <text
+                  x={p.midX}
+                  y={p.midY - 20}
+                  textAnchor="middle"
+                  fontSize={9}
+                  fontFamily="ui-sans-serif, system-ui"
+                  fontWeight={600}
+                  fill="#ffffff"
+                >
+                  Click to delete
+                </text>
+              </g>
+            )}
           </g>
         );
       })}
 
+      {/* Pending edge preview (live, follows mouse) */}
       {pendingPath && (
-        <path
-          d={pendingPath.path}
-          fill="none"
-          stroke={pendingPath.color}
-          strokeWidth={2}
-          strokeDasharray="6 4"
-          strokeOpacity={0.6}
-        />
+        <>
+          <path
+            d={pendingPath.path}
+            fill="none"
+            stroke={pendingPath.color}
+            strokeWidth={2.5}
+            strokeOpacity={0.6}
+            strokeDasharray="8 4"
+            style={{
+              animation: 'dash-flow 0.8s linear infinite',
+            }}
+          />
+          {/* Target indicator at mouse position */}
+          <circle
+            cx={mousePos?.x ?? 0}
+            cy={mousePos?.y ?? 0}
+            r={6}
+            fill={pendingPath.color}
+            fillOpacity={0.3}
+            stroke={pendingPath.color}
+            strokeWidth={2}
+          />
+          <circle
+            cx={mousePos?.x ?? 0}
+            cy={mousePos?.y ?? 0}
+            r={12}
+            fill="none"
+            stroke={pendingPath.color}
+            strokeWidth={1.5}
+            strokeOpacity={0.3}
+            style={{ animation: 'pulse-ring 1.5s ease-out infinite' }}
+          />
+        </>
       )}
+
+      {/* Keyframes for animations */}
+      <style>{`
+        @keyframes dash-flow {
+          to { stroke-dashoffset: -12; }
+        }
+        @keyframes pulse-ring {
+          0% { r: 6; opacity: 0.6; }
+          100% { r: 18; opacity: 0; }
+        }
+      `}</style>
     </svg>
   );
 }
