@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+export const dynamic = 'force-dynamic';
 import { db } from '@/lib/db';
 import type { Metadata } from 'next';
 import { PublicFormRenderer } from '@/components/flowchart/public-form-renderer';

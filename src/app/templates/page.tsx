@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+export const dynamic = 'force-dynamic';
 import { AppShell } from '@/components/app-shell';
 import { TemplatesClient } from '@/components/templates-client';
 

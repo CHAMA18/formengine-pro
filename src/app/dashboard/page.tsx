@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+export const dynamic = 'force-dynamic';
 import Link from 'next/link';
 import { AppShell, Icon } from '@/components/app-shell';
 import { db } from '@/lib/db';
