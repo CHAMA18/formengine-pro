@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, type FormEvent } from 'react';
+import { useState, useMemo, Suspense, type FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -22,6 +22,14 @@ import { GitHubIcon, GoogleIcon } from '@/components/oauth-icons';
  * iframe sandbox blocks RSC fetches.
  */
 export function SignInForm() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-8 text-[13px] text-fe-on-surface-variant">Loading…</div>}>
+      <SignInFormInner />
+    </Suspense>
+  );
+}
+
+function SignInFormInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirect') || '/dashboard';
