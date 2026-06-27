@@ -1,0 +1,31 @@
+FROM node:20-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Copy source
+COPY . .
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Build Next.js
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN npx next build
+
+# Copy standalone files
+RUN cp -r .next/static .next/standalone/.next/ && \
+    cp -r public .next/standalone/
+
+# Install openssl for Prisma
+RUN apt-get update && apt-get install -y --no-install-recommends openssl && \
+    rm -rf /var/lib/apt/lists/*
+
+EXPOSE 3000
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+
+CMD ["sh", "-c", "npx prisma db push --skip-generate && node .next/standalone/server.js"]
