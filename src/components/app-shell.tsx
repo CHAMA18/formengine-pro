@@ -57,7 +57,7 @@ export function AppShell({
   activePath,
   brandSubtitle,
   children,
-  brandName = "EngineFlow Pro",
+  brandName = "FormEngine Pro",
 }: {
   activePath: string;
   brandSubtitle: string;
@@ -92,8 +92,8 @@ export function AppShell({
       style={{ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}
     >
       <header className="fixed top-0 z-50 flex h-16 w-full items-center justify-between border-b border-white/10 bg-fe-surface/80 px-4 backdrop-blur-md min-[480px]:hidden sm:px-6">
-        <Link href="/dashboard" className="text-[20px] font-bold tracking-tight text-fe-primary">
-          FormEngine Pro
+        <Link href="/dashboard" className="text-[20px] font-bold tracking-tight">
+          FormEngine <span className="text-fe-primary-container">Pro</span>
         </Link>
         <div className="flex items-center gap-2">
           <button
@@ -128,29 +128,28 @@ export function AppShell({
         style={{ width: sidebarWidth }}
       >
         <div className={`mb-8 flex items-center gap-4 ${collapsed ? "justify-center px-4" : "px-6"}`}>
-          <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-fe-surface-variant shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
-            {/* Inline SVG avatar — avoids external image dependencies that
-                can be blocked by the preview iframe's CSP/network policy. */}
+          <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border border-fe-border-white-faint bg-fe-surface-variant shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+            {/* Brand logo — amber gradient with "FE" monogram */}
             <svg
               viewBox="0 0 64 64"
               className="h-full w-full"
               role="img"
-              aria-label="Project Icon"
+              aria-label="FormEngine Pro Logo"
             >
               <defs>
                 <linearGradient id="fe-avatar-grad" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0%" stopColor="#0066ff" />
-                  <stop offset="100%" stopColor="#4d8bff" />
+                  <stop offset="0%" stopColor="#f59e0b" />
+                  <stop offset="100%" stopColor="#d97706" />
                 </linearGradient>
               </defs>
-              <rect width="64" height="64" fill="url(#fe-avatar-grad)" />
+              <rect width="64" height="64" fill="url(#fe-avatar-grad)" rx="12" />
               <text
                 x="32"
-                y="40"
+                y="42"
                 textAnchor="middle"
                 fontFamily="ui-sans-serif, system-ui, sans-serif"
-                fontSize="28"
-                fontWeight="700"
+                fontSize="26"
+                fontWeight="800"
                 fill="#ffffff"
               >
                 FE
@@ -159,7 +158,9 @@ export function AppShell({
           </div>
           {!collapsed ? (
             <div>
-              <h1 className="text-[18px] font-bold text-fe-on-surface">{brandName}</h1>
+              <h1 className="text-[18px] font-extrabold text-fe-on-surface">
+                FormEngine <span className="text-fe-primary-container">Pro</span>
+              </h1>
               <p className="text-[12px] text-fe-on-surface-variant">{brandSubtitle}</p>
             </div>
           ) : null}
