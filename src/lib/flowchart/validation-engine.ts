@@ -243,6 +243,9 @@ export function isFieldVisible(
   if (op === 'empty') return !condValue || condValue === '';
   if (op === 'not_empty') return !!condValue && condValue !== '';
   if (op === 'contains') return String(condValue ?? '').includes(condVal);
+  // Numeric comparisons — convert both to numbers
+  if (op === '<') return Number(condValue) < Number(condVal);
+  if (op === '>') return Number(condValue) > Number(condVal);
   return true;
 }
 
