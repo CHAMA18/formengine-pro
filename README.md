@@ -2,6 +2,12 @@
 
 A world-class form builder platform with a visual flowchart editor, dynamic validation engine, REST API, and guided walkthrough.
 
+## Demo Video
+
+[![FormEngine Pro Demo](https://cdn.loom.com/sessions/thumbnails/05d568bf4e314ae79a8eb902ecd5aa61-with-play.svg)](https://www.loom.com/share/05d568bf4e314ae79a8eb902ecd5aa61)
+
+**[Watch the walkthrough on Loom](https://www.loom.com/share/05d568bf4e314ae79a8eb902ecd5aa61)** — See the flowchart builder, validation engine, API, and deployment in action.
+
 ## Features
 
 - **Visual Flowchart Builder** — Drag-and-drop node editor for designing forms
