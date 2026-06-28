@@ -288,12 +288,12 @@ export function ApiDocsClient() {
           <code className="font-mono text-[11px] text-fe-on-surface">
             <span className="text-fe-on-surface-variant"># Bearer token (recommended)</span>
             {'\n'}
-            <span className="text-emerald-400">curl</span> https://your-app.com/api/v1/forms{' \\\n  '}
+            <span className="text-emerald-400">curl</span> https://formengine-pro.onrender.com/api/v1/forms{' \\\n  '}
             <span className="text-fe-primary">-H</span> <span className="text-amber-300">&quot;Authorization: Bearer fep_live_...&quot;</span>
             {'\n\n'}
             <span className="text-fe-on-surface-variant"># x-api-key header</span>
             {'\n'}
-            <span className="text-emerald-400">curl</span> https://your-app.com/api/v1/forms{' \\\n  '}
+            <span className="text-emerald-400">curl</span> https://formengine-pro.onrender.com/api/v1/forms{' \\\n  '}
             <span className="text-fe-primary">-H</span> <span className="text-amber-300">&quot;x-api-key: fep_live_...&quot;</span>
           </code>
         </div>
@@ -452,7 +452,7 @@ export function ApiDocsClient() {
             </div>
             <pre className="overflow-x-auto rounded-lg border border-white/10 bg-fe-surface-base p-3 font-mono text-[11px] text-fe-on-surface">
               <code>{`const res = await fetch(
-  'https://your-app.com/api/v1/forms',
+  'https://formengine-pro.onrender.com/api/v1/forms',
   {
     headers: {
       'Authorization':
@@ -472,7 +472,7 @@ console.log(forms);`}</code>
               <code>{`import requests
 
 res = requests.get(
-  'https://your-app.com/api/v1/forms',
+  'https://formengine-pro.onrender.com/api/v1/forms',
   headers={
     'Authorization':
       'Bearer fep_live_...'
