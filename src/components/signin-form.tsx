@@ -81,28 +81,24 @@ function SignInFormInner() {
   return (
     <>
       <div className="grid grid-cols-2 gap-3">
-        <button
-          type="button"
-          disabled
-          className="group flex items-center justify-center gap-2.5 rounded-xl border border-fe-border-white-faint bg-fe-input-hollow-bg py-2.5 transition-all duration-200 opacity-50 cursor-not-allowed"
-          title="GitHub OAuth coming soon"
+        <a
+          href="/api/auth/oauth/github"
+          className="group flex items-center justify-center gap-2.5 rounded-xl border border-fe-border-white-faint bg-fe-input-hollow-bg py-2.5 transition-all duration-200 hover:bg-fe-surface-container-highest no-underline"
         >
           <GitHubIcon className="h-[19px] w-[19px] text-fe-on-surface" />
           <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-fe-on-surface">
             GitHub
           </span>
-        </button>
-        <button
-          type="button"
-          disabled
-          className="group flex items-center justify-center gap-2.5 rounded-xl border border-fe-border-white-faint bg-fe-input-hollow-bg py-2.5 transition-all duration-200 opacity-50 cursor-not-allowed"
-          title="Google OAuth coming soon"
+        </a>
+        <a
+          href="/api/auth/oauth/google"
+          className="group flex items-center justify-center gap-2.5 rounded-xl border border-fe-border-white-faint bg-fe-input-hollow-bg py-2.5 transition-all duration-200 hover:bg-fe-surface-container-highest no-underline"
         >
           <GoogleIcon className="h-[19px] w-[19px]" />
           <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-fe-on-surface">
             Google
           </span>
-        </button>
+        </a>
       </div>
 
       <div className="my-5 flex items-center gap-3">
