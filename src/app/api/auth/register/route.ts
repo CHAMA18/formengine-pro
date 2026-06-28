@@ -72,8 +72,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('[POST /api/auth/register] error:', error);
+    const message = error instanceof Error ? error.message : 'Failed to register';
     return NextResponse.json(
-      { error: 'Failed to register. Please try again.' },
+      { error: `Failed to register: ${message}` },
       { status: 500 }
     );
   }
