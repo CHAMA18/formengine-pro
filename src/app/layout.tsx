@@ -30,7 +30,8 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "FormEngine Pro" }],
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/favicon.svg",
+    apple: "/apple-touch-icon.svg",
   },
   openGraph: {
     title: "FormEngine Pro | Precision Technical Infrastructure",
