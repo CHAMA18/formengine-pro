@@ -97,7 +97,6 @@ export function AppShell({
                 ))}
                 <div className="my-2 border-t border-white/10" />
                 <LogoutButton variant="sidebar" />
-                <SidebarLink href="#" icon="contact_support" label="Support" />
               </div>
             </div>
           </details>
@@ -173,13 +172,6 @@ export function AppShell({
               {!collapsed ? <span className="text-[14px] font-medium">Collapse</span> : null}
             </button>
           </div>
-
-          <SidebarLink
-            href="#"
-            icon="contact_support"
-            label="Support"
-            collapsed={collapsed}
-          />
 
           {/* Start Tour button — launches the guided walkthrough */}
           <button
