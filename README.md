@@ -167,6 +167,60 @@ bash scripts/test-api-integration.sh
 
 ---
 
+## Test Credentials
+
+The hosted deployment at **https://formengine-pro.onrender.com** supports three ways to sign in. For evaluation convenience, a pre-provisioned test account is available — no signup required.
+
+### Option 1 — Guest sign-in (fastest, no credentials needed)
+
+Click **"Sign In As A Guest"** on the sign-in page, or navigate directly to:
+
+```
+https://formengine-pro.onrender.com/api/auth/guest
+```
+
+This creates a unique guest account (one per browser) and redirects to the dashboard. Each guest's forms, submissions, and API keys are private to that browser. Repeat visits from the same browser reuse the same guest account (via a 30-day cookie).
+
+### Option 2 — Email/password test account
+
+A pre-provisioned test account is available for evaluators:
+
+| Field | Value |
+|-------|-------|
+| **Email** | `evaluator@formengine.pro` |
+| **Password** | `test123456` |
+
+Sign in at **https://formengine-pro.onrender.com/signin** with these credentials. This account has its own private workspace — forms, submissions, and API keys created here are invisible to guest sessions and other accounts.
+
+> **Note:** If the test account doesn't exist (e.g., after a database reset), you can recreate it via the signup page at `/signup` with the same email and password, or via the API:
+> ```bash
+> curl -X POST https://formengine-pro.onrender.com/api/auth/register \
+>   -H "Content-Type: application/json" \
+>   -d '{"email":"evaluator@formengine.pro","password":"test123456","fullName":"Test Evaluator"}'
+> ```
+
+### Option 3 — Create your own account
+
+Sign up at **https://formengine-pro.onrender.com/signup** with any email and password (minimum 6 characters). Each account is entirely separate — your forms, submissions, and API keys are invisible to other accounts.
+
+### API access (for programmatic testing)
+
+Once signed in (via any of the above), create an API key at **https://formengine-pro.onrender.com/api-keys** and use it to test the REST API:
+
+```bash
+# List forms (replace with your API key)
+curl https://formengine-pro.onrender.com/api/v1/forms \
+  -H "Authorization: Bearer fep_live_YOUR_KEY_HERE"
+
+# Create a form
+curl -X POST https://formengine-pro.onrender.com/api/v1/forms \
+  -H "Authorization: Bearer fep_live_YOUR_KEY_HERE" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"My Test Form","flowchart":{"nodes":[{"id":"s","type":"start","position":{"x":0,"y":0},"data":{"label":"Start"}},{"id":"e","type":"field","position":{"x":100,"y":0},"data":{"label":"Email","fieldType":"email","required":true}},{"id":"sub","type":"submit","position":{"x":200,"y":0},"data":{"label":"Submit"}}],"edges":[{"id":"1","source":"s","target":"e"},{"id":"2","source":"e","target":"sub"}]}}'
+```
+
+---
+
 ## Environment Variables
 
 | Variable | Required | Default | Description |
