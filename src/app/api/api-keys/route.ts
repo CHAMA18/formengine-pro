@@ -33,11 +33,16 @@ import {
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { name, permissions } = body as {
-      name?: string;
-      permissions?: string[];
-    };
+    let body: { name?: string; permissions?: string[] };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Request body must be valid JSON' },
+        { status: 400 }
+      );
+    }
+    const { name, permissions } = body;
 
     if (!name || !name.trim()) {
       return NextResponse.json(
@@ -83,7 +88,7 @@ export async function POST(request: NextRequest) {
       permissions: requestedPerms,
       status: apiKey.status,
       createdAt: apiKey.createdAt.toISOString(),
-    });
+    }, { status: 201 });
   } catch (error) {
     console.error('[POST /api/api-keys] error:', error);
     return NextResponse.json(
