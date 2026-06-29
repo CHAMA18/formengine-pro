@@ -30,8 +30,17 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "FormEngine Pro" }],
   icons: {
-    icon: "/logo.svg",
-    apple: "/logo.svg",
+    // Browsers request /favicon.ico by default — the .ico file is served
+    // from public/favicon.ico (multi-resolution: 16, 32, 48). The SVG
+    // is used by modern browsers that support scalable icons. PNG icons
+    // are provided for Apple touch icon and PWA manifest use.
+    icon: [
+      { url: "/favicon.ico", sizes: "48x48" },
+      { url: "/logo.svg", type: "image/svg+xml" },
+    ],
+    apple: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
   },
   openGraph: {
     title: "FormEngine Pro | Precision Technical Infrastructure",
