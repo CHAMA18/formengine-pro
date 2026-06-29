@@ -18,6 +18,8 @@ model User {
   updatedAt     DateTime  @updatedAt
 
   sessions      Session[]
+  forms         Form[]
+  apiKeys       ApiKey[]
 }
 
 model Post {
@@ -38,13 +40,16 @@ model Form {
   flowchart   Json
   schema      Json
   status      String   @default("draft")
+  ownerId     String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   submissions Submission[]
 
   @@index([status])
   @@index([createdAt])
+  @@index([ownerId])
 }
 
 model Submission {
@@ -67,13 +72,17 @@ model ApiKey {
   keyPrefix     String
   status        String    @default("active")
   permissions   Json      @default("[]")
+  ownerId       String
   lastRotatedAt DateTime?
   lastUsedAt    DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  owner         User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
   @@index([status])
   @@index([keyHash])
+  @@index([ownerId])
 }
 
 model Session {
