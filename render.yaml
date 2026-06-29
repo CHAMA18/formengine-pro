@@ -5,7 +5,7 @@ services:
     repo: https://github.com/CHAMA18/formengine-pro
     branch: main
     buildCommand: npm install && npx prisma generate && npm run build
-    startCommand: npx prisma db push --skip-generate --accept-data-loss && npx next start -p $PORT -H 0.0.0.0
+    startCommand: bash scripts/render-start.sh
     healthCheckPath: /
     plan: free
     envVars:
@@ -15,10 +15,6 @@ services:
           property: connectionString
       - key: NODE_ENV
         value: production
-      - key: NEXT_PUBLIC_SUPABASE_URL
-        value: https://placeholder.supabase.co
-      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
-        value: placeholder-anon-key
 
 databases:
   - name: formengine-pg
