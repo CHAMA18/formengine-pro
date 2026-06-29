@@ -74,12 +74,16 @@ export async function POST(request: NextRequest) {
   if (permCheck) return permCheck;
 
   try {
-    const body = await request.json();
-    const { name, description, flowchart } = body as {
-      name?: string;
-      description?: string;
-      flowchart?: unknown;
-    };
+    let body: { name?: string; description?: string; flowchart?: unknown };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Request body must be valid JSON' },
+        { status: 400 }
+      );
+    }
+    const { name, description, flowchart } = body;
 
     if (!name || !name.trim()) {
       return NextResponse.json({ error: 'Form name is required' }, { status: 400 });
