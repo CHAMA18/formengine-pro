@@ -1,19 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
 import { parsePermissions } from '@/lib/api-key-crypto';
 
 /**
  * GET /api/api-keys/[id]
  *
- * Get a single API key's metadata (never the full key).
+ * Get a single API key's metadata (never the full key). Only the key's
+ * owner can access it — keys belonging to other users return 404.
  */
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json(
+      { error: 'You must be signed in.' },
+      { status: 401 }
+    );
+  }
+
   try {
     const { id } = await params;
-    const apiKey = await db.apiKey.findUnique({ where: { id } });
+    // Scope by ownerId so a user can't access another user's key.
+    const apiKey = await db.apiKey.findFirst({
+      where: { id, ownerId: user.id },
+    });
 
     if (!apiKey) {
       return NextResponse.json({ error: 'API key not found' }, { status: 404 });
@@ -39,21 +52,37 @@ export async function GET(
 /**
  * PATCH /api/api-keys/[id]
  *
- * Update an API key's name or permissions.
+ * Update an API key's name or permissions. Only the owner can modify it.
  */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json(
+      { error: 'You must be signed in.' },
+      { status: 401 }
+    );
+  }
+
   try {
     const { id } = await params;
-    const body = await request.json();
-    const { name, permissions } = body as {
-      name?: string;
-      permissions?: string[];
-    };
+    let body: { name?: string; permissions?: string[] };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Request body must be valid JSON' },
+        { status: 400 }
+      );
+    }
+    const { name, permissions } = body;
 
-    const existing = await db.apiKey.findUnique({ where: { id } });
+    // Scope by ownerId so users can't modify each other's keys.
+    const existing = await db.apiKey.findFirst({
+      where: { id, ownerId: user.id },
+    });
     if (!existing) {
       return NextResponse.json({ error: 'API key not found' }, { status: 404 });
     }
@@ -87,15 +116,26 @@ export async function PATCH(
  * DELETE /api/api-keys/[id]
  *
  * Revoke (soft-delete) an API key. The key record is kept for audit but
- * its status is set to "revoked" so it immediately stops working.
+ * its status is set to "revoked" so it immediately stops working. Only
+ * the owner can revoke it.
  */
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json(
+      { error: 'You must be signed in.' },
+      { status: 401 }
+    );
+  }
+
   try {
     const { id } = await params;
-    const existing = await db.apiKey.findUnique({ where: { id } });
+    const existing = await db.apiKey.findFirst({
+      where: { id, ownerId: user.id },
+    });
     if (!existing) {
       return NextResponse.json({ error: 'API key not found' }, { status: 404 });
     }

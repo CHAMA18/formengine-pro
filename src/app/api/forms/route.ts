@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
 import { generateSchema, validateFlowchart } from '@/lib/flowchart/schema-generator';
 import type { Flowchart } from '@/lib/flowchart/types';
 
@@ -9,10 +10,22 @@ import type { Flowchart } from '@/lib/flowchart/types';
  * Publish a flowchart as a shareable form. Persists the flowchart + the
  * generated JSON schema to the database and returns the shareId.
  *
+ * The form is owned by the currently-authenticated user (forms created
+ * by one account are invisible to other accounts).
+ *
  * Body: { name: string, description?: string, flowchart: Flowchart }
  * Response: { id: string, shareId: string }
  */
 export async function POST(request: NextRequest) {
+  // Require authentication — forms must belong to a specific user.
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json(
+      { error: 'You must be signed in to create a form.' },
+      { status: 401 }
+    );
+  }
+
   try {
     let body: { name?: string; description?: string; flowchart?: Flowchart };
     try {
@@ -51,7 +64,7 @@ export async function POST(request: NextRequest) {
     // Generate the JSON schema from the flowchart
     const schema = generateSchema(flowchart, name);
 
-    // Persist to the database
+    // Persist to the database — scoped to the current user via ownerId
     const form = await db.form.create({
       data: {
         name: name.trim(),
@@ -59,6 +72,7 @@ export async function POST(request: NextRequest) {
         flowchart: JSON.stringify(flowchart),
         schema: JSON.stringify(schema),
         status: 'published',
+        ownerId: user.id,
       },
     });
 
@@ -78,11 +92,21 @@ export async function POST(request: NextRequest) {
 /**
  * GET /api/forms
  *
- * List all published forms (for the templates page).
+ * List all forms owned by the currently-authenticated user. Forms
+ * created by other accounts are not included.
  */
 export async function GET() {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json(
+      { error: 'You must be signed in to list forms.' },
+      { status: 401 }
+    );
+  }
+
   try {
     const forms = await db.form.findMany({
+      where: { ownerId: user.id },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,

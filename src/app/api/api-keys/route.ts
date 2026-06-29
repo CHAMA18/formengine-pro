@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
 import {
   generateApiKey,
   hashApiKey,
@@ -13,8 +14,9 @@ import {
 /**
  * POST /api/api-keys
  *
- * Create a new API key. The full key is returned in the response — it is
- * shown to the user ONCE and never stored in plaintext.
+ * Create a new API key owned by the currently-authenticated user. The
+ * full key is returned in the response — it is shown to the user ONCE
+ * and never stored in plaintext.
  *
  * Body: {
  *   name: string,
@@ -32,6 +34,15 @@ import {
  * }
  */
 export async function POST(request: NextRequest) {
+  // Require authentication — API keys belong to a specific user.
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json(
+      { error: 'You must be signed in to create an API key.' },
+      { status: 401 }
+    );
+  }
+
   try {
     let body: { name?: string; permissions?: string[] };
     try {
@@ -69,7 +80,7 @@ export async function POST(request: NextRequest) {
     const keyHash = hashApiKey(fullKey);
     const keyPrefix = getKeyPrefix(fullKey);
 
-    // Persist (only hash + prefix, never the full key)
+    // Persist (only hash + prefix, never the full key) — scoped to user
     const apiKey = await db.apiKey.create({
       data: {
         name: name.trim(),
@@ -77,6 +88,7 @@ export async function POST(request: NextRequest) {
         keyPrefix,
         status: 'active',
         permissions: serializePermissions(requestedPerms),
+        ownerId: user.id,
       },
     });
 
@@ -101,11 +113,22 @@ export async function POST(request: NextRequest) {
 /**
  * GET /api/api-keys
  *
- * List all API keys. Returns metadata only — never the full key.
+ * List all API keys owned by the currently-authenticated user. Keys
+ * created by other accounts are not included. Returns metadata only —
+ * never the full key.
  */
 export async function GET() {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json(
+      { error: 'You must be signed in to list API keys.' },
+      { status: 401 }
+    );
+  }
+
   try {
     const keys = await db.apiKey.findMany({
+      where: { ownerId: user.id },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,

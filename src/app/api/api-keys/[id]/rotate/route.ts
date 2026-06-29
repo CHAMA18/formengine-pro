@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
 import {
   generateApiKey,
   hashApiKey,
@@ -15,6 +16,9 @@ import {
  * The old key immediately stops working (its hash is overwritten).
  * The key id, name, permissions, and metadata all stay the same.
  *
+ * Only the key's owner can rotate it — keys belonging to other users
+ * return 404 (not 403, to avoid leaking the existence of other users' keys).
+ *
  * Response: {
  *   id: string,
  *   key: string,        // NEW full key — only returned here
@@ -26,9 +30,20 @@ export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json(
+      { error: 'You must be signed in.' },
+      { status: 401 }
+    );
+  }
+
   try {
     const { id } = await params;
-    const existing = await db.apiKey.findUnique({ where: { id } });
+    // Scope by ownerId so users can't rotate each other's keys.
+    const existing = await db.apiKey.findFirst({
+      where: { id, ownerId: user.id },
+    });
 
     if (!existing) {
       return NextResponse.json({ error: 'API key not found' }, { status: 404 });
