@@ -28,6 +28,14 @@ export default async function SubmissionsPage() {
     timestamp: string;
   }> = [];
 
+  // Per-form submission counts for the "Submissions by Form" breakdown
+  // and the form-filter dropdown.
+  let formsWithCounts: Array<{
+    formId: string;
+    formName: string;
+    count: number;
+  }> = [];
+
   let metrics = [
     {
       label: 'Total Submissions',
@@ -67,11 +75,30 @@ export default async function SubmissionsPage() {
       id: s.id.toISOString(),
       formId: s.formId,
       formName: s.form.name,
-      data: JSON.parse(s.data) as Record<string, unknown>,
+      data: JSON.parse(String(s.data)) as Record<string, unknown>,
       source: s.source,
       status: s.status,
       timestamp: s.id.toISOString(),
     }));
+
+    // Build per-form submission counts by grouping the loaded rows.
+    // We do this in-memory (instead of a second DB query with groupBy)
+    // because we already have the rows and the count is bounded by
+    // the take:100 limit above.
+    const countMap: Record<string, { formName: string; count: number }> = {};
+    for (const s of submissions) {
+      if (!countMap[s.formId]) {
+        countMap[s.formId] = { formName: s.formName, count: 0 };
+      }
+      countMap[s.formId].count++;
+    }
+    formsWithCounts = Object.entries(countMap)
+      .map(([formId, info]) => ({
+        formId,
+        formName: info.formName,
+        count: info.count,
+      }))
+      .sort((a, b) => b.count - a.count);
 
     const formCount = await db.form.count({
       where: { status: 'published' },
@@ -169,7 +196,10 @@ export default async function SubmissionsPage() {
             ))}
           </section>
 
-          <SubmissionsClient initialSubmissions={submissions} />
+          <SubmissionsClient
+            initialSubmissions={submissions}
+            formsWithCounts={formsWithCounts}
+          />
         </div>
       </div>
     </AppShell>
