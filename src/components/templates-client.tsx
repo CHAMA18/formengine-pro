@@ -77,6 +77,37 @@ export function TemplatesClient() {
     }
   };
 
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  /**
+   * Delete a form via DELETE /api/forms/[id]. On success, removes it
+   * from the local publishedForms list so the UI updates instantly
+   * without a full page reload. Confirms with the user first.
+   */
+  const handleDeleteForm = async (form: PublishedForm) => {
+    const confirmed = window.confirm(
+      `Delete "${form.name}"?\n\nThis will permanently remove the form and all ${form.submissionCount} submission(s). This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setDeletingId(form.id);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/forms/${form.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `Failed to delete (HTTP ${res.status})`);
+      }
+      // Remove from local state
+      setPublishedForms((prev) => prev.filter((f) => f.id !== form.id));
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : 'Failed to delete form');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const filteredTemplates = useMemo(() => {
     if (!search.trim()) return STARTER_TEMPLATES;
     const q = search.toLowerCase();
@@ -233,6 +264,20 @@ export function TemplatesClient() {
 
       {/* Published forms */}
       <section data-tour="templates-published" className="space-y-4">
+        {/* Delete error banner */}
+        {deleteError && (
+          <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-[12px] text-red-300">
+            <Icon name="error" className="mt-0.5 text-[16px] text-red-400" />
+            <span>{deleteError}</span>
+            <button
+              type="button"
+              onClick={() => setDeleteError(null)}
+              className="ml-auto text-red-400 hover:text-red-300"
+            >
+              <Icon name="close" className="text-[14px]" />
+            </button>
+          </div>
+        )}
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-fe-primary-container">
             <Icon name="rocket_launch" className="text-[14px]" />
@@ -307,6 +352,14 @@ export function TemplatesClient() {
                       </td>
                       <td className="px-5 py-3.5">
                         <div className="flex justify-end gap-2">
+                          <Link
+                            href={`/forms/${form.id}/edit`}
+                            className="flex items-center gap-1 rounded-lg border border-white/10 bg-fe-input-hollow-bg px-2.5 py-1.5 text-[11px] font-medium text-fe-on-surface-variant transition-colors hover:text-fe-primary"
+                            title="Edit form in builder"
+                          >
+                            <Icon name="edit" className="text-[14px]" />
+                            Edit
+                          </Link>
                           <button
                             type="button"
                             onClick={() => handleCopyLink(form.shareId)}
@@ -337,6 +390,19 @@ export function TemplatesClient() {
                             <Icon name="inbox" className="text-[14px]" />
                             View
                           </Link>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteForm(form)}
+                            disabled={deletingId === form.id}
+                            className="flex items-center gap-1 rounded-lg border border-red-500/20 bg-red-500/5 px-2.5 py-1.5 text-[11px] font-medium text-red-400 transition-colors hover:bg-red-500/15 hover:text-red-300 disabled:cursor-wait disabled:opacity-50"
+                            title="Delete form and all its submissions"
+                          >
+                            <Icon
+                              name={deletingId === form.id ? 'progress_activity' : 'delete'}
+                              className={`text-[14px] ${deletingId === form.id ? 'animate-spin' : ''}`}
+                            />
+                            {deletingId === form.id ? '…' : 'Delete'}
+                          </button>
                         </div>
                       </td>
                     </tr>
