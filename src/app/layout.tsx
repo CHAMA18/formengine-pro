@@ -30,7 +30,8 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "FormEngine Pro" }],
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/logo.svg",
+    apple: "/logo.svg",
   },
   openGraph: {
     title: "FormEngine Pro | Precision Technical Infrastructure",
@@ -38,12 +39,14 @@ export const metadata: Metadata = {
       "Next-gen schema engineering. Build, validate, and deploy complex logical workflows.",
     siteName: "FormEngine Pro",
     type: "website",
+    images: ["/logo.svg"],
   },
   twitter: {
     card: "summary_large_image",
     title: "FormEngine Pro | Precision Technical Infrastructure",
     description:
       "Next-gen schema engineering. Build, validate, and deploy complex logical workflows.",
+    images: ["/logo.svg"],
   },
 };
 
