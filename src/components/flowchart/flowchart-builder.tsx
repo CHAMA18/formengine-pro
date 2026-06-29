@@ -2,7 +2,7 @@
 
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useFlowchartStore } from '@/lib/flowchart/store';
-import { NODE_CATALOG, type FlowNode, type NodeType } from '@/lib/flowchart/types';
+import { NODE_CATALOG, FIELD_TYPES, type FlowNode, type NodeType } from '@/lib/flowchart/types';
 import { FlowNodeCard } from './flow-node-card';
 import { FlowEdgeLayer } from './flow-edge-layer';
 import { NodePalette } from './node-palette';
@@ -182,14 +182,21 @@ export function FlowchartBuilder() {
       e.preventDefault();
       const type = e.dataTransfer.getData('application/node-type') as NodeType;
       if (!type) return;
+      const fieldType = e.dataTransfer.getData('application/field-type') as string | '';
       const canvas = canvasRef.current;
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
-      const x =
-        (e.clientX - rect.left - viewport.x) / viewport.zoom;
-      const y =
-        (e.clientY - rect.top - viewport.y) / viewport.zoom;
-      addNode(type, { x: x - 90, y: y - 40 });
+      const x = (e.clientX - rect.left - viewport.x) / viewport.zoom;
+      const y = (e.clientY - rect.top - viewport.y) / viewport.zoom;
+      const id = addNode(type, { x: x - 100, y: y - 34 });
+      // If a specific field type was dragged from the sub-palette, apply it
+      if (type === 'field' && fieldType) {
+        const info = FIELD_TYPES.find((f) => f.value === fieldType);
+        useFlowchartStore.getState().updateNodeData(id, {
+          fieldType: fieldType as never,
+          label: info?.label ?? fieldType,
+        });
+      }
     },
     [addNode, viewport]
   );
@@ -239,7 +246,7 @@ export function FlowchartBuilder() {
 
   const selectedNode = flowchart.nodes.find((n) => n.id === selectedNodeId) ?? null;
   const pendingEdgeSource = pendingEdge
-    ? flowchart.nodes.find((n) => n.id === pendingEdge.source)
+    ? flowchart.nodes.find((n) => n.id === pendingEdge.source) ?? null
     : null;
 
   return (
@@ -310,6 +317,27 @@ export function FlowchartBuilder() {
             ))}
           </div>
 
+          {/* Empty-state prompt — shown when there are no nodes on the canvas */}
+          {flowchart.nodes.length === 0 && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-fe-surface-container/60 backdrop-blur-xl">
+                  <span className="material-symbols-outlined text-[32px] text-fe-primary">
+                    add_circle
+                  </span>
+                </div>
+                <div>
+                  <p className="text-[15px] font-semibold text-fe-on-surface">
+                    Start building your form
+                  </p>
+                  <p className="mt-1 text-[12px] text-fe-on-surface-variant">
+                    Drag a node from the palette on the left, or click to add one
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Zoom controls */}
           <div className="absolute bottom-4 left-4 flex items-center gap-1 rounded-lg border border-white/10 bg-fe-surface-container/90 p-1 backdrop-blur-xl">
             <button
@@ -319,10 +347,11 @@ export function FlowchartBuilder() {
               }
               className="rounded p-1.5 text-fe-on-surface-variant transition-colors hover:bg-white/5 hover:text-fe-on-surface"
               aria-label="Zoom out"
+              title="Zoom out"
             >
               <span className="material-symbols-outlined text-[18px]">remove</span>
             </button>
-            <span className="px-2 font-mono text-[11px] text-fe-on-surface-variant">
+            <span className="min-w-[44px] text-center font-mono text-[11px] text-fe-on-surface-variant">
               {Math.round(viewport.zoom * 100)}%
             </span>
             <button
@@ -332,15 +361,53 @@ export function FlowchartBuilder() {
               }
               className="rounded p-1.5 text-fe-on-surface-variant transition-colors hover:bg-white/5 hover:text-fe-on-surface"
               aria-label="Zoom in"
+              title="Zoom in"
             >
               <span className="material-symbols-outlined text-[18px]">add</span>
             </button>
             <div className="mx-1 h-5 w-px bg-white/10" />
+            {/* Fit to view — calculates the bounding box of all nodes and
+                centers/scales them to fit the canvas */}
+            <button
+              type="button"
+              onClick={() => {
+                if (flowchart.nodes.length === 0) {
+                  setViewport({ x: 0, y: 0, zoom: 1 });
+                  return;
+                }
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+                const rect = canvas.getBoundingClientRect();
+                const padding = 80;
+                const nodeWidth = 240;
+                const nodeHeight = 68;
+                const xs = flowchart.nodes.map((n) => n.position.x);
+                const ys = flowchart.nodes.map((n) => n.position.y);
+                const minX = Math.min(...xs);
+                const maxX = Math.max(...xs) + nodeWidth;
+                const minY = Math.min(...ys);
+                const maxY = Math.max(...ys) + nodeHeight;
+                const contentW = maxX - minX;
+                const contentH = maxY - minY;
+                const availW = rect.width - padding * 2;
+                const availH = rect.height - padding * 2;
+                const zoom = Math.min(Math.min(availW / contentW, availH / contentH), 1.5);
+                const x = (rect.width - contentW * zoom) / 2 - minX * zoom;
+                const y = (rect.height - contentH * zoom) / 2 - minY * zoom;
+                setViewport({ x, y, zoom: Math.max(zoom, 0.3) });
+              }}
+              className="rounded p-1.5 text-fe-on-surface-variant transition-colors hover:bg-white/5 hover:text-fe-on-surface"
+              aria-label="Fit to view"
+              title="Fit all nodes in view"
+            >
+              <span className="material-symbols-outlined text-[18px]">fullscreen</span>
+            </button>
             <button
               type="button"
               onClick={() => setViewport({ x: 0, y: 0, zoom: 1 })}
               className="rounded p-1.5 text-fe-on-surface-variant transition-colors hover:bg-white/5 hover:text-fe-on-surface"
-              aria-label="Reset view"
+              aria-label="Reset view to 100%"
+              title="Reset to 100%"
             >
               <span className="material-symbols-outlined text-[18px]">center_focus_strong</span>
             </button>
