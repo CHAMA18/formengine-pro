@@ -53,10 +53,12 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Install openssl (needed by Prisma) and curl (for healthchecks)
+# Install openssl (needed by Prisma), curl (for healthchecks), and
+# netcat-openbsd (for the entrypoint's DB-wait loop).
 RUN apt-get update && apt-get install -y --no-install-recommends \
     openssl \
     curl \
+    netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user for security
@@ -68,10 +70,13 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Copy Prisma files for runtime migrations
+# Copy Prisma files for runtime migrations.
+# We need both the generated client (.prisma + @prisma/client) AND the
+# Prisma CLI itself (prisma) so the entrypoint can run `prisma db push`.
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
 
 # Copy the startup script
 COPY --chown=nextjs:nodejs docker-entrypoint.sh ./docker-entrypoint.sh
