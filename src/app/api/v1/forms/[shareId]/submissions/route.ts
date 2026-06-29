@@ -88,8 +88,16 @@ export async function POST(
 
   try {
     const { shareId } = await params;
-    const body = await request.json();
-    const { data } = body as { data?: Record<string, unknown> };
+    let body: { data?: Record<string, unknown> };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Request body must be valid JSON' },
+        { status: 400 }
+      );
+    }
+    const { data } = body;
 
     if (!data || typeof data !== 'object') {
       return NextResponse.json(
