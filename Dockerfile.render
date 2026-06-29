@@ -27,7 +27,12 @@ RUN cp -r .next/static .next/standalone/.next/ && \
 
 # Copy Prisma files for runtime
 RUN cp -r node_modules/.prisma .next/standalone/node_modules/.prisma && \
-    cp -r node_modules/@prisma .next/standalone/node_modules/@prisma
+    cp -r node_modules/@prisma .next/standalone/node_modules/@prisma && \
+    cp -r node_modules/prisma .next/standalone/node_modules/prisma
+
+# Copy the render start script (handles prisma db push with auto-recovery)
+COPY scripts/render-start.sh ./scripts/render-start.sh
+RUN chmod +x ./scripts/render-start.sh
 
 WORKDIR /app/.next/standalone
 
@@ -36,4 +41,4 @@ ENV HOSTNAME=0.0.0.0
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma db push --skip-generate && node server.js"]
+CMD ["bash", "/app/scripts/render-start.sh"]
