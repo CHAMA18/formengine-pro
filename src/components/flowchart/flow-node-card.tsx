@@ -1,6 +1,6 @@
 'use client';
 
-import { NODE_CATALOG, type FlowNode, type NodeType } from '@/lib/flowchart/types';
+import { NODE_CATALOG, FIELD_TYPES, type FlowNode, type NodeType } from '@/lib/flowchart/types';
 import { useFlowchartStore } from '@/lib/flowchart/store';
 
 /**
@@ -21,8 +21,8 @@ import { useFlowchartStore } from '@/lib/flowchart/store';
  *   - Input handle glows when a connection is being dragged
  */
 
-const NODE_WIDTH = 200;
-const NODE_HEIGHT = 64;
+const NODE_WIDTH = 240;
+const NODE_HEIGHT = 68;
 
 /**
  * Connection validation rules:
@@ -63,6 +63,15 @@ export function FlowNodeCard({
 }) {
   const catalog = NODE_CATALOG[node.type];
   const { deleteNode, flowchart } = useFlowchartStore();
+
+  // Look up the field-type metadata (icon + label) for field nodes so we
+  // can show a distinctive icon next to the label — e.g. an envelope icon
+  // for email fields, a calendar for date fields, etc. This makes the
+  // canvas scannable at a glance: you can tell field types apart without
+  // selecting each node.
+  const fieldTypeInfo = node.type === 'field'
+    ? FIELD_TYPES.find((f) => f.value === node.data.fieldType)
+    : null;
 
   const isCondition = node.type === 'condition';
   const isTerminal = node.type === 'start' || node.type === 'end';
@@ -108,6 +117,7 @@ export function FlowNodeCard({
 
         {/* Node content */}
         <div className="flex items-center gap-3 px-3 py-3">
+          {/* Main type icon (colored) */}
           <div
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
             style={{
@@ -120,21 +130,45 @@ export function FlowNodeCard({
             </span>
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[12px] font-semibold text-fe-on-surface">
-              {node.data.label}
+            {/* Label line — with field-type icon prefix for field nodes */}
+            <div className="flex items-center gap-1.5">
+              {fieldTypeInfo && (
+                <span
+                  className="material-symbols-outlined shrink-0 text-[13px]"
+                  style={{ color: catalog.color }}
+                  title={fieldTypeInfo.label}
+                >
+                  {fieldTypeInfo.icon}
+                </span>
+              )}
+              <div className="truncate text-[12px] font-semibold text-fe-on-surface" title={node.data.label}>
+                {node.data.label}
+              </div>
             </div>
-            <div className="truncate font-mono text-[10px] uppercase tracking-wider text-fe-on-surface-variant">
-              {node.type === 'field'
-                ? node.data.fieldType
-                : node.type === 'condition'
-                ? 'if / else'
-                : node.type}
-              {node.type === 'field' && node.data.required ? ' · required' : ''}
+            {/* Subtitle — field type + required flag, or node type */}
+            <div className="mt-0.5 flex items-center gap-1.5">
+              <span className="truncate font-mono text-[10px] uppercase tracking-wider text-fe-on-surface-variant">
+                {node.type === 'field'
+                  ? fieldTypeInfo?.label ?? node.data.fieldType ?? 'text'
+                  : node.type === 'condition'
+                  ? 'if / else'
+                  : node.type}
+              </span>
+              {node.type === 'field' && node.data.required && (
+                <span className="rounded bg-rose-500/15 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-rose-400">
+                  required
+                </span>
+              )}
+              {node.type === 'field' && node.data.validation && (
+                <span className="text-[9px] text-fe-primary" title="Has validation rules">
+                  ⊟
+                </span>
+              )}
             </div>
           </div>
 
           {/* Connection count badges */}
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1">
             {incomingCount > 0 && (
               <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-fe-primary/10 px-1 text-[9px] font-bold text-fe-primary">
                 ←{incomingCount}
