@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { hashPassword, createSession } from '@/lib/auth';
+import { getPublicOrigin } from '@/lib/url';
 import { randomBytes } from 'crypto';
 
 /**
@@ -20,12 +21,22 @@ import { randomBytes } from 'crypto';
  *   - After creating the session, redirects to the `redirect` query
  *     param (defaults to /dashboard).
  *
+ * Why getPublicOrigin():
+ *   On Render (and similar PaaS), the Node server binds to an internal
+ *   address like `0.0.0.0:10000`. `new URL(request.url).origin` returns
+ *   that internal address, which the browser cannot reach — so the
+ *   redirect would land on a broken `https://0.0.0.0:10000/dashboard`
+ *   URL. getPublicOrigin() reads the `x-forwarded-host` and
+ *   `x-forwarded-proto` headers set by the reverse proxy to reconstruct
+ *   the actual public URL the browser used.
+ *
  * Usage:
  *   <a href="/api/auth/guest">Sign In As A Guest</a>
  */
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
   const redirect = searchParams.get('redirect') || '/dashboard';
+  const origin = getPublicOrigin(request);
 
   try {
     const guestEmail = 'guest@formengine.pro';
