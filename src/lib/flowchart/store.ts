@@ -17,7 +17,7 @@ interface FlowchartState {
   pendingEdge: { source: string; branch?: 'true' | 'false' } | null;
 
   // Actions
-  addNode: (type: NodeType, position?: { x: number; y: number }) => void;
+  addNode: (type: NodeType, position?: { x: number; y: number }) => string;
   updateNodeData: (id: string, data: Partial<FlowNodeData>) => void;
   deleteNode: (id: string) => void;
   selectNode: (id: string | null) => void;
@@ -45,30 +45,30 @@ export const useFlowchartStore = create<FlowchartState>((set, get) => ({
   formDescription: '',
   pendingEdge: null,
 
-  addNode: (type, position) =>
-    set((state) => {
-      const catalog = NODE_CATALOG[type];
-      const id = generateNodeId();
-      const node: FlowNode = {
-        id,
-        type,
-        position: position ?? {
-          x: 400 + Math.random() * 200,
-          y: 200 + Math.random() * 200,
-        },
-        data: {
-          ...catalog.defaultData,
-          label: catalog.defaultData.label ?? catalog.label,
-        } as FlowNodeData,
-      };
-      return {
-        flowchart: {
-          ...state.flowchart,
-          nodes: [...state.flowchart.nodes, node],
-        },
-        selectedNodeId: id,
-      };
-    }),
+  addNode: (type, position) => {
+    const catalog = NODE_CATALOG[type];
+    const id = generateNodeId();
+    const node: FlowNode = {
+      id,
+      type,
+      position: position ?? {
+        x: 400 + Math.random() * 200,
+        y: 200 + Math.random() * 200,
+      },
+      data: {
+        ...catalog.defaultData,
+        label: catalog.defaultData.label ?? catalog.label,
+      } as FlowNodeData,
+    };
+    set((state) => ({
+      flowchart: {
+        ...state.flowchart,
+        nodes: [...state.flowchart.nodes, node],
+      },
+      selectedNodeId: id,
+    }));
+    return id;
+  },
 
   updateNodeData: (id, data) =>
     set((state) => ({
