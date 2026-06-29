@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import ParticleBackground from '@/components/ParticleBackground';
 import { SafeClientBoundary } from '@/components/safe-client-boundary';
-import { ThemeToggleButton } from '@/components/theme-toggle-button';
 import { SignInForm } from '@/components/signin-form';
 import type { Metadata } from 'next';
 
@@ -59,7 +58,6 @@ export default function SignInPage() {
           FormEngine <span className="text-fe-primary-container">Pro</span>
         </Link>
         <div className="flex items-center gap-3">
-          <ThemeToggleButton variant="nav" />
           <a
             className="hidden text-[14px] font-medium text-fe-on-surface-variant transition-colors duration-300 hover:text-fe-primary md:inline-flex"
             href="#support"

@@ -4,8 +4,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { SafeClientBoundary } from '@/components/safe-client-boundary';
-import { ThemeToggleButton } from '@/components/theme-toggle-button';
-import { useTheme } from 'next-themes';
 
 function MaterialIcon({ name, className = '', style }: { name: string; className?: string; style?: React.CSSProperties }) {
   return (
@@ -54,23 +52,20 @@ function StepNumber({ num }: { num: string }) {
 
 export default function Home() {
   const router = useRouter();
-  const { resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  const isDark = mounted ? resolvedTheme === 'dark' : true;
 
-  // BuilderKing-style colors
+  // Theme is forced to dark via the root ThemeProvider (forcedTheme="dark"),
+  // so we hardcode the dark palette here. No more conditional isDark checks.
   const accent = '#f59e0b'; // amber/gold
   const accentLight = '#fef3c7';
   const accentDark = '#92400e';
   const greenStatus = '#10b981';
-  const textColor = isDark ? '#f5f5f4' : '#1a1a1a';
-  const subtextColor = isDark ? '#a8a29e' : '#666666';
-  const bgColor = isDark ? '#0c0a09' : '#ffffff';
-  const cardBg = isDark ? '#1c1917' : '#ffffff';
-  const secondaryBg = isDark ? '#1c1917' : '#f8f8f8';
-  const borderColor = isDark ? '#292524' : '#e7e5e4';
-  const cardShadow = isDark ? 'none' : '0 4px 12px rgba(0,0,0,0.05)';
+  const textColor = '#f5f5f4';
+  const subtextColor = '#a8a29e';
+  const bgColor = '#0c0a09';
+  const cardBg = '#1c1917';
+  const secondaryBg = '#1c1917';
+  const borderColor = '#292524';
+  const cardShadow = 'none';
 
   const goToSignin = () => {
     router.push('/signin');
@@ -102,22 +97,20 @@ export default function Home() {
         {/* Faint dot pattern */}
         <div className="absolute inset-0 opacity-[0.015]"
           style={{
-            backgroundImage: `radial-gradient(${isDark ? '#fff' : '#000'} 1px, transparent 1px)`,
+            backgroundImage: `radial-gradient(#fff 1px, transparent 1px)`,
             backgroundSize: '24px 24px',
           }} />
         {/* Soft radial glow at top */}
         <div className="absolute inset-0"
           style={{
-            background: isDark
-              ? 'radial-gradient(ellipse 60% 40% at 50% 0%, rgba(245,158,11,0.06), transparent 70%)'
-              : 'radial-gradient(ellipse 60% 40% at 50% 0%, rgba(245,158,11,0.04), transparent 70%)',
+            background: 'radial-gradient(ellipse 60% 40% at 50% 0%, rgba(245,158,11,0.06), transparent 70%)',
           }} />
       </div>
 
       {/* === Navigation === */}
       <nav className="fixed top-0 z-50 w-full border-b backdrop-blur-xl"
         style={{
-          background: isDark ? 'rgba(12,10,9,0.8)' : 'rgba(255,255,255,0.85)',
+          background: 'rgba(12,10,9,0.8)',
           borderColor,
         }}>
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
@@ -132,7 +125,6 @@ export default function Home() {
             <Link href="/docs/api" className="text-[14px] font-medium transition-colors hover:opacity-60" style={{ color: textColor }}>Docs</Link>
           </div>
           <div className="flex items-center gap-3">
-            <ThemeToggleButton variant="nav" />
             <button onClick={goToSignin} className="hidden sm:block text-[14px] font-medium transition-opacity hover:opacity-60" style={{ color: subtextColor }}>
               Sign In
             </button>
@@ -153,7 +145,7 @@ export default function Home() {
             <Reveal>
               <div>
                 <div className="mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-medium"
-                  style={{ borderColor: isDark ? '#292524' : '#e7e5e4', background: secondaryBg, color: subtextColor }}>
+                  style={{ borderColor: '#292524', background: secondaryBg, color: subtextColor }}>
                   <span className="h-2 w-2 rounded-full animate-pulse" style={{ background: greenStatus }} />
                   Dynamic form builder engine
                 </div>
@@ -371,7 +363,7 @@ export default function Home() {
                   <span className="h-3 w-3 rounded-full" style={{ background: '#10b981', opacity: 0.7 }} />
                   <span className="ml-3 text-[12px] font-mono" style={{ color: subtextColor }}>terminal</span>
                 </div>
-                <pre className="overflow-x-auto p-5 font-mono text-[13px] leading-relaxed" style={{ background: isDark ? '#0c0a09' : '#fafaf9' }}>
+                <pre className="overflow-x-auto p-5 font-mono text-[13px] leading-relaxed" style={{ background: '#0c0a09' }}>
                   <code><span style={{ color: '#10b981' }}>curl</span> <span style={{ color: accent }}>-X POST</span> \
 {'  '}https://your-app.com/api/v1/forms \
 {'  '}<span style={{ color: accent }}>-H</span> <span style={{ color: '#ef4444' }}>&quot;Authorization: Bearer fep_live_...&quot;</span> \

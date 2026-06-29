@@ -53,7 +53,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning style={{ colorScheme: "dark" }}>
       <head>
         {/* Satoshi (Indian Type Foundry) via Fontshare CDN */}
         <link
@@ -90,7 +90,12 @@ export default function RootLayout({
         className={`${jetbrainsMono.variable} antialiased font-sans`}
         suppressHydrationWarning
       >
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+        {/* forcedTheme="dark" guarantees dark mode is ALWAYS active regardless
+            of any stale localStorage value from prior visits. Together with
+            the `dark` class on <html> and color-scheme: dark, this ensures
+            every visitor — new or returning — sees the dark UI on first
+            paint and on every subsequent navigation. */}
+        <ThemeProvider attribute="class" defaultTheme="dark" forcedTheme="dark" enableSystem={false}>
           {children}
           <Toaster />
           <WalkthroughOverlay />

@@ -276,6 +276,14 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /* Force dark color-scheme on the root element so browser-native UI
+     (scrollbars, form controls, dropdowns, date pickers) renders in dark
+     mode. The app forces dark theme via the ThemeProvider (forcedTheme="dark"),
+     so we declare color-scheme: dark unconditionally on <html>. */
+  html {
+    color-scheme: dark;
+    scrollbar-gutter: stable;
+  }
   body {
     @apply bg-background text-foreground;
   }

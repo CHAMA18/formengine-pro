@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
-import { useTheme } from "next-themes";
+import { useMemo, useState } from "react";
 import { LogoutButton } from "@/components/logout-button";
 import { useWalkthrough } from "@/lib/walkthrough";
 
@@ -65,17 +64,8 @@ export function AppShell({
   children: ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(false);
-  const { theme, resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => setMounted(true), []);
 
   const sidebarWidth = collapsed ? 88 : 320;
-  // HYDRATION SAFETY: Before mounted, always use 'dark' (the SSR default).
-  const currentTheme = mounted
-    ? resolvedTheme || theme || "dark"
-    : "dark";
 
   const nav = useMemo(
     () =>
@@ -96,15 +86,6 @@ export function AppShell({
           FormEngine <span className="text-fe-primary-container">Pro</span>
         </Link>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setTheme(currentTheme === "dark" ? "light" : "dark")}
-            className="rounded-lg border border-white/10 bg-fe-input-hollow-bg p-2 text-fe-on-surface-variant transition-colors hover:text-fe-primary"
-            aria-label="Toggle theme"
-            suppressHydrationWarning
-          >
-            <Icon name={currentTheme === "dark" ? "light_mode" : "dark_mode"} />
-          </button>
           <details className="relative">
             <summary className="list-none cursor-pointer rounded-lg p-2 text-fe-on-surface-variant transition-colors hover:text-fe-primary [&::-webkit-details-marker]:hidden">
               <Icon name="menu" />
@@ -177,23 +158,6 @@ export function AppShell({
         <div className="border-t border-white/10 px-4 pt-4">
           <div className="mb-3 space-y-2">
             <LogoutButton variant="sidebar" collapsed={collapsed} />
-            <button
-              type="button"
-              onClick={() => setTheme(currentTheme === "dark" ? "light" : "dark")}
-              className={`flex w-full items-center gap-4 rounded-lg border border-white/10 bg-fe-input-hollow-bg px-4 py-3 text-left text-fe-on-surface-variant transition-all duration-200 hover:bg-white/5 hover:text-fe-on-surface ${
-                collapsed ? "justify-center px-0" : ""
-              }`}
-              aria-label="Toggle dark and light mode"
-              suppressHydrationWarning
-            >
-              <Icon name={currentTheme === "dark" ? "light_mode" : "dark_mode"} className="text-[20px]" />
-              {!collapsed ? (
-              <span className="text-[14px] font-medium" suppressHydrationWarning>
-                  {currentTheme === "dark" ? "Light Mode" : "Dark Mode"}
-                </span>
-              ) : null}
-            </button>
-
             <button
               type="button"
               onClick={() => setCollapsed((value) => !value)}
