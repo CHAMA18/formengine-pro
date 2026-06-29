@@ -26,83 +26,144 @@ A world-class form builder platform with a visual flowchart editor, dynamic vali
 
 ---
 
-## Quick Start (Docker Compose) — Recommended
+## Quick Start
 
-The easiest way to run FormEngine Pro locally. Spins up PostgreSQL + the app with one command.
+FormEngine Pro ships with a containerised setup (Docker Compose) and a one-command local dev script. Choose whichever you prefer.
 
-### Prerequisites
+### Option A — Docker Compose (recommended, zero prerequisites)
 
-- [Docker](https://docs.docker.com/get-docker/)
-- [Docker Compose](https://docs.docker.com/compose/install/) (included with Docker Desktop)
+Spins up PostgreSQL 16 + the FormEngine Pro app in two containers with one command. No need to install Node.js, PostgreSQL, or any dependencies on your host machine.
 
-### Steps
+**Prerequisites:** [Docker](https://docs.docker.com/get-docker/) + [Docker Compose](https://docs.docker.com/compose/install/) (Docker Desktop includes both).
 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/CHAMA18/formengine-pro.git
 cd formengine-pro
 
-# 2. (Optional) Configure environment variables
-cp .env.example .env
-# Edit .env if you want to change database credentials or add Supabase
+# 2. Start the stack (builds the image on first run — takes ~3-5 min)
+docker compose up
 
-# 3. Start the stack
-docker-compose up
-
-# The first build takes ~3-5 minutes. Subsequent starts are instant.
+# → App:   http://localhost:3000
+# → DB:    localhost:5432 (user: fep, password: fep_password, db: formengine)
 ```
 
-The app will be available at **http://localhost:3000**
+The first `docker compose up` builds the Next.js production bundle inside the container. Subsequent starts are instant (layers are cached). The app automatically:
 
-- PostgreSQL runs on `localhost:5432` (user: `fep`, password: `fep_password`, db: `formengine`)
-- The app automatically runs database migrations on startup
+1. Waits for PostgreSQL to accept connections
+2. Pushes the Prisma schema (creates all tables)
+3. Starts the Next.js standalone server
 
-### Stopping
+**Background mode** (detached):
 
 ```bash
-# Stop containers (data is preserved in a Docker volume)
-docker-compose down
+docker compose up -d              # start in background
+docker compose logs -f app        # tail app logs
+docker compose logs -f db         # tail database logs
+docker compose down               # stop (data is preserved in a volume)
+docker compose down -v            # stop + delete all database data
+```
 
-# Stop and delete all database data
-docker-compose down -v
+**Verify it's running:**
+
+```bash
+curl http://localhost:3000/                                 # → 200 OK (HTML)
+curl http://localhost:3000/api/auth/guest -L -o /dev/null   # → guest sign-in, 200
 ```
 
 ---
 
-## Local Development (without Docker)
+### Option B — Local dev script (requires Node.js + PostgreSQL)
 
-If you prefer running the app directly with `bun` or `npm`:
+If you already have Node.js and PostgreSQL installed locally, use the included `scripts/dev.sh` script. It handles dependency installation, database creation, schema migration, and server startup in one command.
 
-### Prerequisites
-
-- [Node.js 20+](https://nodejs.org/) or [Bun](https://bun.sh/)
-- [PostgreSQL 14+](https://www.postgresql.org/download/) (or use Docker just for the DB: `docker run -d -p 5432:5432 -e POSTGRES_USER=fep -e POSTGRES_PASSWORD=fep_password -e POSTGRES_DB=formengine postgres:16-alpine`)
-
-### Steps
+**Prerequisites:**
+- [Node.js 20+](https://nodejs.org/)
+- [PostgreSQL 16+](https://www.postgresql.org/download/) running on `localhost:5432`
 
 ```bash
 # 1. Clone
 git clone https://github.com/CHAMA18/formengine-pro.git
 cd formengine-pro
 
-# 2. Install dependencies
-bun install
-# or: npm install
+# 2. Run the dev script (creates .env, installs deps, creates DB, starts server)
+./scripts/dev.sh
 
-# 3. Configure environment
+# → App: http://localhost:3000
+```
+
+**Flags:**
+
+```bash
+./scripts/dev.sh --reset     # Reset the database first (drops all data!)
+./scripts/dev.sh --build     # Build + run the production server instead of dev
+```
+
+The script will:
+1. Create `.env` from `.env.example` (if missing)
+2. Ensure the PostgreSQL user `fep` and database `formengine` exist
+3. Run `npm install` (if `node_modules` is missing)
+4. Run `npx prisma generate` + `npx prisma db push` (create/migrate tables)
+5. Start `npm run dev` (hot-reloading dev server)
+
+---
+
+### Option C — Manual setup (full control)
+
+If you want to run each step yourself:
+
+```bash
+git clone https://github.com/CHAMA18/formengine-pro.git
+cd formengine-pro
+
+# Install dependencies
+npm install
+
+# Configure environment
 cp .env.example .env
 # Edit .env — set DATABASE_URL to your PostgreSQL connection string
 
-# 4. Create the database schema
-bun run db:push
-# or: npx prisma db push
+# Generate the Prisma client + push schema to the database
+npx prisma generate
+npx prisma db push
 
-# 5. Start the dev server
-bun run dev
-# or: npm run dev
+# Start the dev server
+npm run dev
+# → http://localhost:3000
 ```
 
-The app will be available at **http://localhost:3000**
+**Just want the database in Docker?** You can run PostgreSQL in a container and the app on your host:
+
+```bash
+docker run -d --name formengine-db -p 5432:5432 \
+  -e POSTGRES_USER=fep -e POSTGRES_PASSWORD=fep_password \
+  -e POSTGRES_DB=formengine postgres:16-alpine
+```
+
+Then proceed with the manual steps above.
+
+---
+
+### Verifying your setup
+
+Regardless of which option you chose, verify the app is working:
+
+```bash
+# 1. Home page loads
+curl -sS http://localhost:3000/ | grep -o '<title>[^<]*</title>'
+# → <title>FormEngine Pro | Precision Technical Infrastructure</title>
+
+# 2. Guest sign-in works (creates a session + redirects to /dashboard)
+curl -sS -L -o /dev/null -w '%{http_code} %{url_effective}\n' http://localhost:3000/api/auth/guest
+# → 200 http://localhost:3000/dashboard
+
+# 3. API is reachable (should return 401 without a key)
+curl -sS http://localhost:3000/api/v1/forms
+# → {"error":"Missing API key..."}
+
+# 4. Run the full API integration test suite (57 tests)
+bash scripts/test-api-integration.sh
+```
 
 ---
 
