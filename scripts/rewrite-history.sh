@@ -45,8 +45,8 @@ Dev / deploy scripts (.zscripts/)
 Infrastructure
 - Caddyfile: reverse proxy gateway with XTransformPort routing
   for cross-port API + websocket requests
-- prisma/schema.prisma: Prisma ORM config (SQLite client)
-- db/custom.db: local SQLite database file
+- prisma/schema.prisma: Prisma ORM config (PostgreSQL client)
+- PostgreSQL database (via DATABASE_URL env var)
 - examples/websocket/{frontend,server}.ts: socket.io reference
   implementation demonstrating the XTransformPort pattern
 
@@ -266,8 +266,8 @@ Dev / deploy scripts (.zscripts/)
 Infrastructure
 - Caddyfile: reverse proxy gateway with XTransformPort routing
   for cross-port API + websocket requests
-- prisma/schema.prisma: Prisma ORM config (SQLite client)
-- db/custom.db: local SQLite database file
+- prisma/schema.prisma: Prisma ORM config (PostgreSQL client)
+- PostgreSQL database (via DATABASE_URL env var)
 - examples/websocket/{frontend,server}.ts: socket.io reference
   implementation demonstrating the XTransformPort pattern
 

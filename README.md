@@ -4,9 +4,11 @@ A world-class form builder platform with a visual flowchart editor, dynamic vali
 
 ## Demo Video
 
-[![FormEngine Pro Demo](https://cdn.loom.com/sessions/thumbnails/05d568bf4e314ae79a8eb902ecd5aa61-with-play.svg)](https://www.loom.com/share/05d568bf4e314ae79a8eb902ecd5aa61)
+<a href="https://www.loom.com/share/05d568bf4e314ae79a8eb902ecd5aa61" target="_blank" rel="noopener">
+  <img src="public/images/loom-demo-thumbnail.gif" alt="FormEngine Pro Demo — click to play" width="1024" height="596" style="max-width:100%;border-radius:12px;border:1px solid #292524;" />
+</a>
 
-**[Watch the walkthrough on Loom](https://www.loom.com/share/05d568bf4e314ae79a8eb902ecd5aa61)** — See the flowchart builder, validation engine, API, and deployment in action.
+**[▶ Watch the walkthrough on Loom](https://www.loom.com/share/05d568bf4e314ae79a8eb902ecd5aa61)** — See the flowchart builder, validation engine, API, and deployment in action.
 
 ## Features
 
@@ -338,21 +340,20 @@ This means a form is never in a half-published state: either the full flowchart 
 
 | Decision | Trade-off | Why It's Acceptable |
 |----------|-----------|---------------------|
-| **SQLite for local dev** | Can't test PostgreSQL-specific features (JSONB indexing, GIN indexes) | Prisma abstracts the difference; schema is identical; switching to PostgreSQL is a one-line change |
+| **PostgreSQL for both local dev and production** | Heavier local setup than SQLite (needs a running Postgres instance) | One consistent database across all environments; can test JSONB indexing, GIN indexes, and Postgres-specific queries locally; Docker Compose makes local Postgres a one-command start |
 | **SHA-256 for passwords** (not bcrypt/argon2) | Fast hashing = vulnerable to offline brute-force if DB leaks | 256-bit random salt + high-entropy passwords mitigate this; would use bcrypt in production |
 | **No schema versioning on submissions** | Old submissions can't be re-validated after form changes | Submissions store raw data that's always readable; re-validation is not needed for display |
 | **Zustand for builder state** (not Redux) | No devtools middleware, no time-travel debugging | The builder is a single-page tool; local state is sufficient; Redux would add overhead |
 | **Custom SVG edges** (not React Flow) | No built-in features (edge routing, minimap, node grouping) | Full control over rendering, smaller bundle, no external dependency |
 | **No background jobs** | Form publishing is synchronous | Publishing is fast (<100ms); no need for queue infrastructure |
 | **No rate limiting** | API is vulnerable to abuse | Prototype scope; would add Redis-based rate limiting in production |
-| **Ephemeral storage on Render free tier** | Data lost on deploy/sleep | Mitigated by PostgreSQL database; SQLite fallback only for quick demos |
+| **Ephemeral filesystem on Render free tier** | Container filesystem is reset on deploy/sleep | All persistent data lives in the managed PostgreSQL database; no state is stored on disk |
 
 #### Scaling to Production
 
 To take this engine from prototype to production-ready cloud environment:
 
 **Database**:
-- Migrate from SQLite to managed PostgreSQL (RDS, Cloud SQL, or Supabase)
 - Add GIN indexes on JSONB columns for efficient querying inside form configs
 - Implement connection pooling (PgBouncer or Prisma's built-in pool)
 - Set up read replicas for submission queries (reads >> writes)
@@ -431,7 +432,7 @@ I understand and can explain every part of what is submitted:
 - **API Key System**: Keys are 256-bit random (`crypto.randomBytes(32)`), formatted as `fep_live_<hex>`. Only the SHA-256 hash is stored. Rotation overwrites the hash (old key stops working immediately). Permissions are hierarchical (write implies read).
 - **Authentication**: Passwords hashed with SHA-256 + per-user 16-byte salt. Verification uses `timingSafeEqual` to prevent timing attacks. Sessions are 256-bit tokens in httpOnly cookies, 30-day expiry, stored in a `Session` table.
 - **Flowchart Builder**: Zustand store manages nodes/edges/selection. Canvas uses CSS transforms for pan/zoom. Edges are SVG bezier curves calculated from node positions. Connection handles validate node type compatibility (start can't receive, end can't send).
-- **Database**: Prisma ORM with PostgreSQL. Form configurations stored as `Json` columns (JSONB in PostgreSQL) for atomic updates and single-query loading. SQLite used for local development with the same schema.
+- **Database**: Prisma ORM with PostgreSQL. Form configurations stored as `Json` columns (JSONB in PostgreSQL) for atomic updates and single-query loading. The same PostgreSQL instance is used in local dev, Docker, and production so schema and query behavior are identical across environments.
 
 ---
 

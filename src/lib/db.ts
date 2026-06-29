@@ -6,7 +6,6 @@ const globalForPrisma = globalThis as unknown as {
 
 const logConfig = process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error']
 
-// Try PostgreSQL first, fall back to SQLite if it fails
 function createPrismaClient(): PrismaClient {
   return new PrismaClient({
     log: logConfig as never,
