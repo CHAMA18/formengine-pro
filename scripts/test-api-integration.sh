@@ -47,7 +47,7 @@ assert_status() {
 
 assert_contains() {
   local label="$1" needle="$2" haystack="$3"
-  if echo "$haystack" | grep -q "$needle"; then
+  if echo "$haystack" | grep -qF "$needle"; then
     echo -e "  ${GREEN}✓${NC} $label"
     PASS=$((PASS+1))
   else
@@ -60,7 +60,7 @@ assert_contains() {
 
 assert_not_contains() {
   local label="$1" needle="$2" haystack="$3"
-  if echo "$haystack" | grep -q "$needle"; then
+  if echo "$haystack" | grep -qF "$needle"; then
     echo -e "  ${RED}✗${NC} $label — response should NOT contain '$needle'"
     echo "    response: $(echo "$haystack" | head -c 300)"
     FAIL=$((FAIL+1))
@@ -185,19 +185,19 @@ FORM_BODY=$(cat <<'EOF'
   "description": "Created by the API integration test suite to verify POST /api/v1/forms works end-to-end.",
   "flowchart": {
     "nodes": [
-      { "id": 1, "type": "start", "position": { "x": 100, "y": 100 }, "data": { "label": "Start" } },
-      { "id": 2, "type": "field", "position": { "x": 300, "y": 100 }, "data": { "label": "Email", "fieldType": "email", "required": true, "placeholder": "you@example.com" } },
-      { "id": 3, "type": "field", "position": { "x": 500, "y": 100 }, "data": { "label": "Full Name", "fieldType": "text", "required": true, "minLength": 2, "maxLength": 80 } },
-      { "id": 4, "type": "field", "position": { "x": 700, "y": 100 }, "data": { "label": "Age", "fieldType": "number", "required": false, "min": 13, "max": 120 } },
-      { "id": 5, "type": "field", "position": { "x": 900, "y": 100 }, "data": { "label": "Feedback", "fieldType": "textarea", "required": true, "minLength": 10, "maxLength": 1000 } },
-      { "id": 6, "type": "submit", "position": { "x": 1100, "y": 100 }, "data": { "label": "Submit" } }
+      { "id": "node-start", "type": "start", "position": { "x": 100, "y": 100 }, "data": { "label": "Start" } },
+      { "id": "node-email", "type": "field", "position": { "x": 300, "y": 100 }, "data": { "label": "Email", "fieldType": "email", "required": true, "placeholder": "you@example.com" } },
+      { "id": "node-name", "type": "field", "position": { "x": 500, "y": 100 }, "data": { "label": "Full Name", "fieldType": "text", "required": true, "validation": { "minLength": 2, "maxLength": 80 } } },
+      { "id": "node-age", "type": "field", "position": { "x": 700, "y": 100 }, "data": { "label": "Age", "fieldType": "number", "required": false, "validation": { "min": 13, "max": 120 } } },
+      { "id": "node-feedback", "type": "field", "position": { "x": 900, "y": 100 }, "data": { "label": "Feedback", "fieldType": "textarea", "required": true, "validation": { "minLength": 10, "maxLength": 1000 } } },
+      { "id": "node-submit", "type": "submit", "position": { "x": 1100, "y": 100 }, "data": { "label": "Submit" } }
     ],
     "edges": [
-      { "from": 1, "to": 2 },
-      { "from": 2, "to": 3 },
-      { "from": 3, "to": 4 },
-      { "from": 4, "to": 5 },
-      { "from": 5, "to": 6 }
+      { "id": "e1", "source": "node-start", "target": "node-email" },
+      { "id": "e2", "source": "node-email", "target": "node-name" },
+      { "id": "e3", "source": "node-name", "target": "node-age" },
+      { "id": "e4", "source": "node-age", "target": "node-feedback" },
+      { "id": "e5", "source": "node-feedback", "target": "node-submit" }
     ]
   }
 }
@@ -260,10 +260,10 @@ section "7. Submit form response (POST /api/v1/forms/{shareId}/submissions)"
 VALID_SUBMISSION=$(cat <<'EOF'
 {
   "data": {
-    "2": "test-user@example.com",
-    "3": "Test User",
-    "4": 28,
-    "5": "This is a valid test submission with at least 10 characters."
+    "node-email": "test-user@example.com",
+    "node-name": "Test User",
+    "node-age": 28,
+    "node-feedback": "This is a valid test submission with at least 10 characters."
   }
 }
 EOF
@@ -290,7 +290,7 @@ section "8. Submit invalid response (validation should fail)"
 INVALID_SUB_MISSING=$(cat <<'EOF'
 {
   "data": {
-    "2": "test@example.com"
+    "node-email": "test@example.com"
   }
 }
 EOF
@@ -312,8 +312,8 @@ INVALID_EMAIL=$(cat <<'EOF'
 {
   "data": {
     "2": "not-an-email",
-    "3": "Test User",
-    "5": "This is a valid feedback message with enough characters."
+    "node-name": "Test User",
+    "node-feedback": "This is a valid feedback message with enough characters."
   }
 }
 EOF
@@ -328,10 +328,10 @@ assert_status "Invalid email format → 422" "422" "$INVALID_EMAIL_STATUS"
 INVALID_NUM=$(cat <<'EOF'
 {
   "data": {
-    "2": "test@example.com",
-    "3": "Test User",
-    "4": 500,
-    "5": "This is a valid feedback message with enough characters."
+    "node-email": "test@example.com",
+    "node-name": "Test User",
+    "node-age": 500,
+    "node-feedback": "This is a valid feedback message with enough characters."
   }
 }
 EOF
@@ -346,9 +346,9 @@ assert_status "Age out of range (500 > 120) → 422" "422" "$INVALID_NUM_STATUS"
 INVALID_SHORT=$(cat <<'EOF'
 {
   "data": {
-    "2": "test@example.com",
-    "3": "Test User",
-    "5": "short"
+    "node-email": "test@example.com",
+    "node-name": "Test User",
+    "node-feedback": "short"
   }
 }
 EOF
