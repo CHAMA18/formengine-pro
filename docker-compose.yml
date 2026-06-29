@@ -1,19 +1,26 @@
 # ===========================================
 # FormEngine Pro — Docker Compose
 # ===========================================
-# Spins up PostgreSQL + the FormEngine Pro app with one command.
+# Spins up PostgreSQL 16 + the FormEngine Pro app with one command.
 #
 # Usage:
-#   docker-compose up              # Start both services
-#   docker-compose up -d           # Start in background (detached)
-#   docker-compose down            # Stop and remove containers
-#   docker-compose down -v         # Also delete the database volume
+#   docker compose up              # Start both services (foreground)
+#   docker compose up -d           # Start in background (detached)
+#   docker compose down            # Stop and remove containers
+#   docker compose down -v         # Also delete the database volume
+#   docker compose logs -f app     # Tail app logs
+#   docker compose logs -f db      # Tail database logs
 #
-# The app will be available at: http://localhost:3000
-# PostgreSQL will be available at: localhost:5432
+# Once running:
+#   App:        http://localhost:3000
+#   Database:   localhost:5432 (user: fep, pass: fep_password, db: formengine)
+#
+# The first build takes ~3-5 minutes (downloads Node, installs deps,
+# builds Next.js). Subsequent starts are instant because the layers
+# are cached.
 
 services:
-  # --- PostgreSQL Database ---
+  # --- PostgreSQL 16 Database ---
   db:
     image: postgres:16-alpine
     container_name: formengine-db
@@ -27,13 +34,14 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
+      # pg_isready returns 0 when Postgres is ready to accept connections
       test: ["CMD-SHELL", "pg_isready -U fep -d formengine"]
       interval: 5s
       timeout: 5s
       retries: 10
       start_period: 10s
 
-  # --- FormEngine Pro App ---
+  # --- FormEngine Pro Next.js App ---
   app:
     build:
       context: .
@@ -43,15 +51,20 @@ services:
     ports:
       - "3000:3000"
     environment:
-      # Use the Docker-internal hostname "db" to reach PostgreSQL
+      # Connect to the db service using Docker's internal DNS hostname "db"
       DATABASE_URL: "postgresql://fep:fep_password@db:5432/formengine?schema=public"
-      NEXT_PUBLIC_SUPABASE_URL: "${NEXT_PUBLIC_SUPABASE_URL:-https://placeholder.supabase.co}"
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: "${NEXT_PUBLIC_SUPABASE_ANON_KEY:-placeholder-anon-key}"
       NODE_ENV: production
     depends_on:
+      # Don't start the app until the DB healthcheck passes
       db:
         condition: service_healthy
-    # Wait for DB to be healthy, then the entrypoint runs migrations + starts server
+    # The entrypoint waits for DB, runs prisma db push, then starts the server
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
   postgres_data:
