@@ -400,7 +400,7 @@ export default function Home() {
           <div className="grid gap-4 md:grid-cols-3">
             {[
               { name: 'Starter', price: '$0', period: '/mo', desc: 'For getting started', features: ['Unlimited forms', 'Unlimited submissions', 'Visual builder', 'REST API access', '1 API key', 'Community support'], cta: 'Start Free', highlight: false },
-              { name: 'Engine', price: '$29', period: '/mo', desc: 'For growing teams', features: ['Everything in Starter', 'Unlimited API keys', 'Key rotation', 'Priority support', 'Custom domains', 'Webhook integrations'], cta: 'Get Started', highlight: true },
+              { name: 'Engine', price: '$0', period: '/mo', desc: 'For growing teams', features: ['Everything in Starter', 'Unlimited API keys', 'Key rotation', 'Priority support', 'Custom domains', 'Webhook integrations'], cta: 'Get Started', highlight: true },
               { name: 'Enterprise', price: 'Custom', period: '', desc: 'For large organizations', features: ['Everything in Engine', 'SSO / SAML', 'Dedicated infrastructure', 'Custom SLAs', 'Audit logs', 'Dedicated architect'], cta: 'Talk to Sales', highlight: false },
             ].map((plan, i) => (
               <Reveal key={plan.name} delay={i * 80}>
