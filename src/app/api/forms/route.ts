@@ -14,12 +14,16 @@ import type { Flowchart } from '@/lib/flowchart/types';
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { name, description, flowchart } = body as {
-      name?: string;
-      description?: string;
-      flowchart?: Flowchart;
-    };
+    let body: { name?: string; description?: string; flowchart?: Flowchart };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Request body must be valid JSON' },
+        { status: 400 }
+      );
+    }
+    const { name, description, flowchart } = body;
 
     if (!name || !name.trim()) {
       return NextResponse.json(
