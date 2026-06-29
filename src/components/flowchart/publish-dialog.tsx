@@ -7,15 +7,23 @@ import { useFlowchartStore } from '@/lib/flowchart/store';
  * PublishDialog
  *
  * Modal that handles publishing a flowchart to a shareable form.
- * On publish, calls POST /api/forms to persist the form + schema to the
- * database, then displays the generated shareable link.
+ *
+ * - When `editFormId` is NOT provided: calls POST /api/forms to create a
+ *   brand-new form.
+ * - When `editFormId` IS provided: calls PATCH /api/forms/[id] to update
+ *   an existing form's flowchart + schema (used by the builder's edit mode).
+ *
+ * On success, displays the generated shareable link.
  */
 export function PublishDialog({
   open,
   onClose,
+  editFormId,
 }: {
   open: boolean;
   onClose: () => void;
+  /** If provided, the dialog updates this form instead of creating a new one. */
+  editFormId?: string | null;
 }) {
   const { flowchart, formName, formDescription, getErrors, reset } =
     useFlowchartStore();
@@ -32,24 +40,33 @@ export function PublishDialog({
     setPublishing(true);
     setError(null);
     try {
-      const res = await fetch('/api/forms', {
-        method: 'POST',
+      const isEditing = !!editFormId;
+      const url = isEditing
+        ? `/api/forms/${editFormId}`
+        : '/api/forms';
+      const method = isEditing ? 'PATCH' : 'POST';
+
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: formName,
           description: formDescription,
           flowchart,
+          // When editing, keep the form published so the share link
+          // continues to work after the update.
+          status: 'published',
         }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? `Failed to publish (HTTP ${res.status})`);
+        throw new Error(body.error ?? `Failed to ${isEditing ? 'update' : 'publish'} (HTTP ${res.status})`);
       }
       const data = await res.json();
       const origin = window.location.origin;
       setShareUrl(`${origin}/f/${data.shareId}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to publish form');
+      setError(e instanceof Error ? e.message : `Failed to ${editFormId ? 'update' : 'publish'} form`);
     } finally {
       setPublishing(false);
     }
@@ -86,7 +103,13 @@ export function PublishDialog({
               rocket_launch
             </span>
             <h2 className="text-[16px] font-bold text-fe-on-surface">
-              {shareUrl ? 'Form Published' : 'Publish Form'}
+              {shareUrl
+                ? editFormId
+                  ? 'Form Updated'
+                  : 'Form Published'
+                : editFormId
+                ? 'Update Form'
+                : 'Publish Form'}
             </h2>
           </div>
           <button
