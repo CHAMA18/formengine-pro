@@ -109,8 +109,11 @@ The app will be available at **http://localhost:3000**
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `DATABASE_URL` | Yes | — | PostgreSQL connection string (e.g. `postgresql://user:pass@host:5432/db?schema=public`) |
-| `NEXT_PUBLIC_SUPABASE_URL` | No | placeholder | Supabase project URL (only needed for OAuth/email auth) |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | No | placeholder | Supabase anon key (only needed for OAuth/email auth) |
+
+Authentication is fully self-contained — email/password sign-in, email/password
+sign-up, and a one-click **"Sign In As A Guest"** mode that creates a shared
+guest account. No third-party OAuth providers or external auth services are
+used, so no client IDs, secrets, or Supabase keys are required.
 
 Copy `.env.example` to `.env` and adjust:
 
@@ -367,7 +370,7 @@ To take this engine from prototype to production-ready cloud environment:
 
 **Authentication**:
 - Switch from SHA-256 to bcrypt/argon2 for password hashing
-- Add OAuth providers (GitHub, Google) via NextAuth.js
+- Add per-browser guest accounts (currently a single shared guest identity)
 - Implement refresh tokens for long-lived sessions
 - Add CSRF protection on all mutation endpoints
 

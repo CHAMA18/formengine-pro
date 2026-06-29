@@ -23,13 +23,30 @@ function SignInFormInner() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirect') || '/dashboard';
 
+  // Surface auth error codes returned by /api/auth/* as a friendly banner
+  // at the top of the form so the user knows why the redirect brought them
+  // back here.
+  const authErrorParam = searchParams.get('error');
+  const authErrorMessage: string | null = (() => {
+    switch (authErrorParam) {
+      case 'guest_failed':
+        return 'Guest sign-in failed. Please try again or use email/password.';
+      case 'oauth_failed':
+        return 'Authentication failed. Please try again or use email/password.';
+      case null:
+        return null;
+      default:
+        return 'Authentication error. Please try again.';
+    }
+  })();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(authErrorMessage);
   const [success, setSuccess] = useState(false);
 
   const navigateToDashboard = () => {
@@ -80,35 +97,6 @@ function SignInFormInner() {
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-3">
-        <a
-          href="/api/auth/oauth/github"
-          className="group flex items-center justify-center gap-2.5 rounded-xl border border-fe-border-white-faint bg-fe-input-hollow-bg py-2.5 transition-all duration-200 hover:bg-fe-surface-container-highest no-underline"
-        >
-          <GitHubIcon className="h-[19px] w-[19px] text-fe-on-surface" />
-          <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-fe-on-surface">
-            GitHub
-          </span>
-        </a>
-        <a
-          href="/api/auth/oauth/google"
-          className="group flex items-center justify-center gap-2.5 rounded-xl border border-fe-border-white-faint bg-fe-input-hollow-bg py-2.5 transition-all duration-200 hover:bg-fe-surface-container-highest no-underline"
-        >
-          <GoogleIcon className="h-[19px] w-[19px]" />
-          <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-fe-on-surface">
-            Google
-          </span>
-        </a>
-      </div>
-
-      <div className="my-5 flex items-center gap-3">
-        <div className="h-px flex-1 bg-fe-border-white-faint" />
-        <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-fe-outline">
-          Or continue with mail
-        </span>
-        <div className="h-px flex-1 bg-fe-border-white-faint" />
-      </div>
-
       <form className="grid gap-3" onSubmit={handleEmailSignIn} noValidate>
         <FieldShell label="Work Email">
           <input
@@ -200,6 +188,22 @@ function SignInFormInner() {
           )}
         </button>
       </form>
+
+      <div className="my-5 flex items-center gap-3">
+        <div className="h-px flex-1 bg-fe-border-white-faint" />
+        <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-fe-outline">
+          Or
+        </span>
+        <div className="h-px flex-1 bg-fe-border-white-faint" />
+      </div>
+
+      <a
+        href={`/api/auth/guest?redirect=${encodeURIComponent(redirectTo)}`}
+        className="group flex w-full items-center justify-center gap-2.5 rounded-xl border border-fe-border-white-faint bg-fe-input-hollow-bg px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-fe-on-surface transition-all duration-200 hover:bg-fe-surface-container-highest hover:border-fe-primary-container/40 no-underline"
+      >
+        <AuthIcon name="person" className="text-[17px] text-fe-primary-container" />
+        Sign In As A Guest
+      </a>
     </>
   );
 }
@@ -239,6 +243,3 @@ function FieldShell({
     </div>
   );
 }
-
-// Re-export the OAuth icons for the disabled buttons
-import { GitHubIcon, GoogleIcon } from '@/components/oauth-icons';
