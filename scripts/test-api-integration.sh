@@ -370,7 +370,7 @@ assert_status "List submissions returns 200" "200" "$LIST_SUBS_STATUS"
 assert_contains "Response contains submissions array" '"submissions":[' "$LIST_SUBS_RESP"
 assert_contains "Response contains total count" '"total":' "$LIST_SUBS_RESP"
 assert_contains "Our valid submission is in the list" "test-user@example.com" "$LIST_SUBS_RESP"
-assert_contains "Submission data keyed by field id" '"2":' "$LIST_SUBS_RESP"
+assert_contains "Submission data keyed by field id" '"node-email":' "$LIST_SUBS_RESP"
 
 # 9b. Pagination — limit + offset
 PAGE_RESP=$(curl -sS -H "Authorization: Bearer $API_KEY" "$BASE/api/v1/forms/$FORM_SHARE_ID/submissions?limit=1&offset=0")
