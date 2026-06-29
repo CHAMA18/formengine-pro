@@ -4,7 +4,7 @@ services:
     env: node
     repo: https://github.com/CHAMA18/formengine-pro
     branch: main
-    buildCommand: npm install && npx prisma generate && npm run build
+    buildCommand: bash scripts/render-build.sh
     startCommand: bash scripts/render-start.sh
     healthCheckPath: /
     plan: free
