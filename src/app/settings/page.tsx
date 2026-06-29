@@ -54,10 +54,19 @@ export default async function SettingsPage() {
 
   try {
     user = await getCurrentUser();
-    formCount = await db.form.count();
-    submissionCount = await db.submission.count();
-    apiKeyCount = await db.apiKey.count();
-    activeApiKeyCount = await db.apiKey.count({ where: { status: 'active' } });
+    if (user) {
+      // Scope ALL counts to the current user — each account's stats are
+      // independent and invisible to other accounts.
+      formCount = await db.form.count({ where: { ownerId: user.id } });
+      // Count submissions only for forms owned by this user.
+      submissionCount = await db.submission.count({
+        where: { form: { ownerId: user.id } },
+      });
+      apiKeyCount = await db.apiKey.count({ where: { ownerId: user.id } });
+      activeApiKeyCount = await db.apiKey.count({
+        where: { ownerId: user.id, status: 'active' },
+      });
+    }
   } catch {
     // DB not available — show defaults
   }

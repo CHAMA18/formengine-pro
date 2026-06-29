@@ -48,8 +48,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Load submissions (optionally filtered by formId), newest first.
-    const where = formId ? { formId } : {};
+    // Load submissions OWNED BY THE CURRENT USER (via the form's ownerId),
+    // optionally filtered by formId, newest first.
+    const where = formId
+      ? { formId, form: { ownerId: user.id } }
+      : { form: { ownerId: user.id } };
     const rows = await db.submission.findMany({
       where,
       orderBy: { id: 'desc' },

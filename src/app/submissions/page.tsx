@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 export const dynamic = 'force-dynamic';
 import { db } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
 import { AppShell, Icon } from '@/components/app-shell';
 import { SubmissionsClient } from '@/components/submissions-client';
 
@@ -61,15 +62,22 @@ export default async function SubmissionsPage() {
   ];
 
   try {
-    const rows = await db.submission.findMany({
-      orderBy: { id: 'desc' },
-      take: 100,
-      include: {
-        form: {
-          select: { id: true, name: true, shareId: true },
-        },
-      },
-    });
+    // Require authentication — submissions are scoped to the current user.
+    // Only submissions belonging to the user's own forms are loaded.
+    const currentUser = await getCurrentUser();
+
+    const rows = currentUser
+      ? await db.submission.findMany({
+          where: { form: { ownerId: currentUser.id } },
+          orderBy: { id: 'desc' },
+          take: 100,
+          include: {
+            form: {
+              select: { id: true, name: true, shareId: true },
+            },
+          },
+        })
+      : [];
 
     submissions = rows.map((s) => ({
       id: s.id.toISOString(),
@@ -82,9 +90,6 @@ export default async function SubmissionsPage() {
     }));
 
     // Build per-form submission counts by grouping the loaded rows.
-    // We do this in-memory (instead of a second DB query with groupBy)
-    // because we already have the rows and the count is bounded by
-    // the take:100 limit above.
     const countMap: Record<string, { formName: string; count: number }> = {};
     for (const s of submissions) {
       if (!countMap[s.formId]) {
@@ -100,9 +105,12 @@ export default async function SubmissionsPage() {
       }))
       .sort((a, b) => b.count - a.count);
 
-    const formCount = await db.form.count({
-      where: { status: 'published' },
-    });
+    // Count the current user's published forms (not all forms globally).
+    const formCount = currentUser
+      ? await db.form.count({
+          where: { status: 'published', ownerId: currentUser.id },
+        })
+      : 0;
 
     const latest = submissions[0]?.timestamp;
     const latestLabel = latest

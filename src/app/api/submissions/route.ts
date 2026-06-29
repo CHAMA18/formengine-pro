@@ -112,8 +112,9 @@ export async function POST(request: NextRequest) {
 /**
  * GET /api/submissions
  *
- * List all submissions across all forms (for the Submissions page).
- * Optionally filter by ?formId= or ?shareId=
+ * List all submissions for forms OWNED BY THE CURRENT USER. Submissions
+ * belonging to other users' forms are not included. Optionally filter
+ * by ?formId= or ?shareId= (the form must belong to the caller).
  */
 export async function GET(request: NextRequest) {
   try {
@@ -121,12 +122,26 @@ export async function GET(request: NextRequest) {
     const formId = searchParams.get('formId');
     const shareId = searchParams.get('shareId');
 
-    const where: { formId?: string } = {};
+    // Require authentication — submissions are scoped to the current user.
+    const { getCurrentUser } = await import('@/lib/auth');
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { error: 'You must be signed in to list submissions.' },
+        { status: 401 }
+      );
+    }
+
+    // Build the where clause — always scope to the current user's forms.
+    const where: { form?: { ownerId: string }; formId?: string } = {
+      form: { ownerId: user.id },
+    };
     if (formId) where.formId = formId;
 
     if (shareId) {
-      const form = await db.form.findUnique({
-        where: { shareId },
+      // Verify the form exists AND belongs to the caller.
+      const form = await db.form.findFirst({
+        where: { shareId, ownerId: user.id },
         select: { id: true },
       });
       if (!form) {

@@ -140,21 +140,44 @@ export default async function DashboardPage() {
     submissionCount: number;
   }> = [];
 
+  // Get the current logged-in user (real database auth) — used to
+  // scope ALL data queries so each account only sees its own forms.
+  let displayName = 'Engineer';
+  let currentUserId: string | null = null;
   try {
-    // Get all published forms with their submission counts
-    const forms = await db.form.findMany({
-      orderBy: { updatedAt: 'desc' },
-      select: {
-        id: true,
-        shareId: true,
-        name: true,
-        description: true,
-        status: true,
-        createdAt: true,
-        updatedAt: true,
-        _count: { select: { submissions: true } },
-      },
-    });
+    const user = await getCurrentUser();
+    if (user) {
+      currentUserId = user.id;
+      displayName =
+        user.fullName ||
+        user.name ||
+        user.email?.split('@')[0] ||
+        'Engineer';
+    }
+  } catch {
+    // Not logged in — use default
+  }
+
+  try {
+    // Get all forms OWNED BY THE CURRENT USER with their submission counts.
+    // If not signed in, return an empty list (the dashboard will show
+    // the empty state instead of leaking other users' data).
+    const forms = currentUserId
+      ? await db.form.findMany({
+          where: { ownerId: currentUserId },
+          orderBy: { updatedAt: 'desc' },
+          select: {
+            id: true,
+            shareId: true,
+            name: true,
+            description: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+            _count: { select: { submissions: true } },
+          },
+        })
+      : [];
 
     formsWithCounts = forms.map((f) => ({
       id: f.id,
@@ -175,21 +198,6 @@ export default async function DashboardPage() {
 
   // System health is always high since the app is running
   const systemHealth = '100.0%';
-
-  // Get the current logged-in user (real database auth)
-  let displayName = 'Engineer';
-  try {
-    const user = await getCurrentUser();
-    if (user) {
-      displayName =
-        user.fullName ||
-        user.name ||
-        user.email?.split('@')[0] ||
-        'Engineer';
-    }
-  } catch {
-    // Not logged in — use default
-  }
 
   // Pick an icon for each form based on its name (simple heuristic)
   const iconForForm = (name: string): string => {
