@@ -22,7 +22,10 @@ export async function GET(
 
   try {
     const { shareId } = await params;
-    const form = await db.form.findUnique({ where: { shareId } });
+    // Scope by ownerId so users can't read other users' forms by shareId.
+    const form = await db.form.findFirst({
+      where: { shareId, ownerId: auth.ownerId },
+    });
 
     if (!form) {
       return NextResponse.json({ error: 'Form not found' }, { status: 404 });

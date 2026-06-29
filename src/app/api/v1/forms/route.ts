@@ -22,8 +22,9 @@ export async function GET(request: NextRequest) {
   if (permCheck) return permCheck;
 
   try {
+    // Scope to the API key owner's forms — other users' forms are invisible.
     const forms = await db.form.findMany({
-      where: { status: 'published' },
+      where: { status: 'published', ownerId: auth.ownerId },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
@@ -106,6 +107,9 @@ export async function POST(request: NextRequest) {
     }
 
     const schema = generateSchema(fc, name);
+    // auth.ownerId is guaranteed to exist because authenticateApiKey()
+    // only returns authenticated: true when a valid key was found, and
+    // every key has an ownerId. The `!` asserts this to TypeScript.
     const form = await db.form.create({
       data: {
         name: name.trim(),
@@ -113,6 +117,7 @@ export async function POST(request: NextRequest) {
         flowchart: JSON.stringify(fc),
         schema: JSON.stringify(schema),
         status: 'published',
+        ownerId: auth.ownerId!,
       },
     });
 

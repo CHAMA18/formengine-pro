@@ -27,7 +27,11 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get('offset') ?? '0', 10) || 0;
     const formId = searchParams.get('formId');
 
-    const where = formId ? { formId } : {};
+    // Scope to the API key owner's forms only — other users' submissions
+    // are invisible. If formId is provided, it must belong to the owner.
+    const where = formId
+      ? { formId, form: { ownerId: auth.ownerId } }
+      : { form: { ownerId: auth.ownerId } };
 
     const [submissions, total] = await Promise.all([
       db.submission.findMany({

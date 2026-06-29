@@ -15,6 +15,7 @@ export interface AuthResult {
   authenticated: boolean;
   keyId?: string;
   keyName?: string;
+  ownerId?: string;
   permissions?: string[];
   error?: string;
   statusCode?: number;
@@ -98,6 +99,7 @@ export async function authenticateApiKey(
     authenticated: true,
     keyId: apiKey.id,
     keyName: apiKey.name,
+    ownerId: apiKey.ownerId,
     permissions: parsePermissions(apiKey.permissions),
   };
 }

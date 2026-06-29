@@ -30,8 +30,9 @@ export async function GET(
     const limit = Math.min(parseInt(searchParams.get('limit') ?? '50', 10) || 50, 200);
     const offset = parseInt(searchParams.get('offset') ?? '0', 10) || 0;
 
-    const form = await db.form.findUnique({
-      where: { shareId },
+    // Scope by ownerId so users can't list submissions for other users' forms.
+    const form = await db.form.findFirst({
+      where: { shareId, ownerId: auth.ownerId },
       select: { id: true, name: true, shareId: true },
     });
 
@@ -106,7 +107,10 @@ export async function POST(
       );
     }
 
-    const form = await db.form.findUnique({ where: { shareId } });
+    // Scope by ownerId so users can't submit to other users' forms via API.
+    const form = await db.form.findFirst({
+      where: { shareId, ownerId: auth.ownerId },
+    });
     if (!form) {
       return NextResponse.json({ error: 'Form not found' }, { status: 404 });
     }
