@@ -135,9 +135,42 @@ export function validateFlowchart(flowchart: Flowchart): string[] {
   const errors: string[] = [];
   const { nodes, edges } = flowchart;
 
-  if (nodes.length === 0) {
+  if (!nodes || !Array.isArray(nodes) || nodes.length === 0) {
     errors.push('Flowchart is empty — add at least one node.');
     return errors;
+  }
+
+  if (!edges || !Array.isArray(edges)) {
+    errors.push('Flowchart edges must be an array.');
+    return errors;
+  }
+
+  // Validate that all edges have the required source/target properties.
+  // A common mistake is using { from, to } instead of { source, target },
+  // which would silently produce an empty schema (the BFS traversal
+  // filters by e.source, so edges without source are invisible).
+  const malformedEdges = edges.filter(
+    (e) => !e.source || !e.target
+  );
+  if (malformedEdges.length > 0) {
+    errors.push(
+      `${malformedEdges.length} edge(s) are missing "source" or "target" properties. ` +
+      'Edges must use { source, target } — not { from, to }.'
+    );
+  }
+
+  // Validate that all edge endpoints reference existing node IDs.
+  // This catches typos and orphaned edges early, instead of silently
+  // producing a schema that's missing fields.
+  const nodeIds = new Set(nodes.map((n) => n.id));
+  const danglingEdges = edges.filter(
+    (e) => e.source && e.target && (!nodeIds.has(e.source) || !nodeIds.has(e.target))
+  );
+  if (danglingEdges.length > 0) {
+    errors.push(
+      `${danglingEdges.length} edge(s) reference nonexistent node IDs. ` +
+      'All source/target values must match a node id.'
+    );
   }
 
   const hasStart = nodes.some((n) => n.type === 'start');
